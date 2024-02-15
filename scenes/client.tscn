@@ -1,0 +1,47 @@
+[gd_scene load_steps=6 format=3 uid="uid://clb01f0ifogre"]
+
+[ext_resource type="Script" path="res://scenes/client.gd" id="1_x1e1o"]
+[ext_resource type="PackedScene" uid="uid://bmyetss0yrpp5" path="res://scenes/spawners/map_spawner.tscn" id="2_pgb0g"]
+[ext_resource type="PackedScene" uid="uid://btlnnfbdmap5w" path="res://scenes/spawners/character_spawner.tscn" id="3_r7d4j"]
+[ext_resource type="PackedScene" uid="uid://b43a0dnmkibyw" path="res://scenes/client_input_handler.tscn" id="4_53bko"]
+[ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://scenes/network_messenger.tscn" id="5_ilfw4"]
+
+[node name="NetworkRoot" type="Node"]
+script = ExtResource("1_x1e1o")
+
+[node name="Label" type="Label" parent="."]
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -45.0
+offset_bottom = 23.0
+grow_horizontal = 0
+text = "Client"
+
+[node name="Label2" type="Label" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -35.0
+offset_right = 141.0
+offset_bottom = 34.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.905882, 1, 0.027451, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 25
+text = "Client"
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
+spawn_path = NodePath("../Spawns")
+
+[node name="Spawns" type="Node" parent="."]
+
+[node name="MapSpawner" parent="." instance=ExtResource("2_pgb0g")]
+
+[node name="CharacterSpawner" parent="." instance=ExtResource("3_r7d4j")]
+
+[node name="ClientInputHandler" parent="." instance=ExtResource("4_53bko")]
+
+[node name="NetworkMessenger" parent="." instance=ExtResource("5_ilfw4")]
