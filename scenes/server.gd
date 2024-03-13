@@ -7,6 +7,8 @@ const SPAWN_POINT = Vector3(0, 2.5, 0)
 @onready var messenger: NetworkMessenger = $NetworkMessenger
 @onready var map_spawner: MultiplayerSpawner = $MapSpawner
 @onready var character_spawner: MultiplayerSpawner = $CharacterSpawner
+@onready var entity_spawner: NetworkEntityRegistry = $NetworkEntityRegistry
+@onready var input_buffer: PlayerInputBuffer = PlayerInputBuffer.new(entity_spawner)
 
 var test_scene = preload("res://scenes/test_spawn.tscn")
 
@@ -15,8 +17,8 @@ var client_character: CharacterMovementKinematicBody = null
 var character_physics_state: Dictionary = {}
 var client_id: int = -1
 var client_inputs = []
-
 var character_simulation_per_client: Dictionary = {}
+var world_state_timeline_: WorldStateTimeline = WorldStateTimeline.new()
 
 func _ready():
 	resize_window()
@@ -25,9 +27,15 @@ func _ready():
 	messenger.received_client_message.connect(_handle_client_message)
 	LogsAndMetrics.add_server_stat("sv_buffer_size")
 	map_spawner.spawn(null)
+	#get_tree().create_timer(10).timeout.connect(despawn)
+
+func despawn():
+	for child_node in entity_spawner.get_children():
+		entity_spawner.remove_child(child_node)
 
 func _handle_client_message(id, message):
-	character_simulation_per_client[id].add_client_message(message)
+	input_buffer.buffer_input_for_client(id, InputState.from_dict(message["input"]))
+	#character_simulation_per_client[id].add_client_message(message)
 
 var last_phys_ts = 0
 var initial_tick_diff = 0
@@ -35,23 +43,81 @@ func _physics_process(delta):
 	for client_id in character_simulation_per_client:
 		var simulation_for_client: CharacterSimulation = character_simulation_per_client[client_id]
 		simulation_for_client.advance_state_and_notify_clients(character_simulation_per_client.keys())
+	var next_state = {}
+	for spawn_data in spawn_data_to_add:
+		next_state.merge(spawn_data)
+	world_state_timeline_.add_next_state(next_state)
+	var client_inputs: Dictionary = input_buffer.get_latest_input_per_client(next_state)
 
 func resize_window(index=0):
 	var screen_size: Vector2 = DisplayServer.screen_get_size()
 	get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
 	get_window().position = Vector2(screen_size.x / 2, index * (screen_size.y / 2))
 
+#func _on_client_connected(id: int):
+	#var spawn_point = SPAWN_POINT + SPAWN_POINT_RANDOM_VARIATION * Vector3(rng.randf_range(-1,1), 0, rng.randf_range(-1,1))
+	#var client_connection_index = character_simulation_per_client.size()
+	##var client_character = character_spawner.spawn({"id": id, "position": spawn_point})
+	#
+	#spawn_character_new(id, spawn_point)
+	#
+	##character_simulation_per_client[id] = CharacterSimulation.new(id, client_character, messenger)
+	#messenger.send_message_to_client(id, { "resize": client_connection_index , "type": Network.MessageType.RESIZE })
+	#resize_window(client_connection_index)
+	#print("Client with id ", id, " connected")
+
 func _on_client_connected(id: int):
 	var spawn_point = SPAWN_POINT + SPAWN_POINT_RANDOM_VARIATION * Vector3(rng.randf_range(-1,1), 0, rng.randf_range(-1,1))
-	var client_connection_index = character_simulation_per_client.size()
-	var client_character = character_spawner.spawn({"id": id, "position": spawn_point})
-	character_simulation_per_client[id] = CharacterSimulation.new(id, client_character, messenger)
-	messenger.send_message_to_client(id, { "resize": client_connection_index , "type": Network.MessageType.RESIZE })
-	resize_window(client_connection_index)
-	print("Client with id ", id, " connected")
-	
+	spawn_character(id, spawn_point)
+	var prior_peer_count = multiplayer.get_peers().size() - 1
+	resize_window(prior_peer_count)
+	messenger.send_message_to_client(
+		id, { "resize": prior_peer_count , "type": Network.MessageType.RESIZE })
+
+var spawn_data_to_add = []
+func spawn_character(client_id: int, spawn_point: Vector3):
+	var spawned_entity: Node = entity_spawner.spawn_entity({"entity_network_owner_id": client_id})
+	var entity_id: int = int(str(spawned_entity.name))
+	spawn_data_to_add.append({
+		entity_id: {
+			StateType.CHARACTER_PHYSICS: CharacterPhysicsState.new(spawn_point, Vector3.ZERO, false)
+		}
+	})
+
 func _on_client_disconnected(id: int):
 	print("Client with id ", id, " disconnected")
+
+class PlayerInputBuffer:
+	var entity_spawner_: NetworkEntityRegistry
+	var input_buffer_per_client_id_: Dictionary = {}
+	
+	func _init(entity_spawner: NetworkEntityRegistry):
+		entity_spawner_ = entity_spawner
+	
+	func buffer_input_for_client(client_peer_id: int, input: InputState):
+		var queue_factory: Callable = func(x): 
+			return RefillingQueue.new(true, "sv_input_buf_size[cl=%s]" % client_peer_id)
+		var input_buffer_for_client: RefillingQueue = Utils.compute_if_absent(
+			input_buffer_per_client_id_, client_peer_id, queue_factory)
+		input_buffer_for_client.push(input)
+	
+	func get_latest_input_per_client(world_state: Dictionary) -> Dictionary:
+		var latest_input_per_client: Dictionary = {}
+		# for now assume the only entities are characters
+		for character_entity_id in world_state:
+			var client_id_for_character = (
+				entity_spawner_.get_network_owner_id_for_entity(character_entity_id))
+			if client_id_for_character in input_buffer_per_client_id_:
+				var input_queue_for_client: RefillingQueue = (
+					input_buffer_per_client_id_[client_id_for_character])
+				var latest_client_input: QueueItem = input_queue_for_client.pop()
+				if latest_client_input.is_valid():
+					latest_input_per_client[character_entity_id] = latest_client_input.value()
+		return latest_input_per_client
+	
+	func remove_unused_client_buffers(valid_client_ids: Array[int]):
+		# TODO if no entity with this client id exists anymore, KILL
+		pass
 
 class CharacterSimulation:
 	const EMPTY_INPUT_FOR_BUFFERING = { "INPUT": "EMPTY" }

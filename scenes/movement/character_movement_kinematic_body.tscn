@@ -7,18 +7,18 @@
 [sub_resource type="SphereShape3D" id="SphereShape3D_12wfh"]
 radius = 2.5
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uadyx"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qe4hp"]
 albedo_texture = ExtResource("2_06vcv")
 metallic_specular = 1.0
 roughness = 0.0
 uv1_offset = Vector3(0.25, -0.245, 0)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_byl00"]
-material = SubResource("StandardMaterial3D_uadyx")
+material = SubResource("StandardMaterial3D_qe4hp")
 top_radius = 0.985
 height = 4.0
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bea3n"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l52vo"]
 albedo_color = Color(0.996078, 0, 0.627451, 1)
 metallic_specular = 0.85
 roughness = 0.18
@@ -28,7 +28,7 @@ subsurf_scatter_strength = 0.17
 subsurf_scatter_skin_mode = true
 
 [sub_resource type="SphereMesh" id="SphereMesh_fysfn"]
-material = SubResource("StandardMaterial3D_bea3n")
+material = SubResource("StandardMaterial3D_l52vo")
 radius = 2.5
 height = 5.0
 
@@ -51,7 +51,6 @@ fov = 90.0
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Camera3D"]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, -1.86022)
-visible = false
 mesh = SubResource("CylinderMesh_byl00")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]

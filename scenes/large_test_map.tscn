@@ -45,6 +45,7 @@ shadow_opacity = 0.6
 environment = ExtResource("1_mdafn")
 
 [node name="Bounds" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4, 0)
 
 [node name="Floor" type="StaticBody3D" parent="Bounds"]
 
@@ -79,7 +80,7 @@ transform = Transform3D(-5.73206e-15, 1.31134e-07, -1, -1, -4.37114e-08, 0, -4.3
 shape = SubResource("WorldBoundaryShape3D_1dcql")
 
 [node name="Obstacles" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -39)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -4, -39)
 
 [node name="Block" parent="Obstacles" instance=ExtResource("4_m0jij")]
 transform = Transform3D(20, 0, 0, 0, 20, 0, 0, 0, 20, 0, 0, 0)
@@ -103,12 +104,12 @@ transform = Transform3D(20, 0, 0, 0, 10, 0, 0, 0, 20, 0.16, -4.33, -45.99)
 transform = Transform3D(20, 0, 0, 0, 10, 0, 0, 0, 20, 34.16, 13.67, -26.99)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.358, 2.51, -26.792)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.358, -1.49, -26.792)
 visible = false
 mesh = SubResource("SphereMesh_eobyi")
 
 [node name="DebugSphere" parent="." instance=ExtResource("5_npfxi")]
-transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 24.845, 1.429, -28.99)
+transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 24.845, -2.571, -28.99)
 
 [node name="CubicPig" parent="." instance=ExtResource("6_123b8")]
-transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 30, 2.5, -27)
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 30, -1.5, -27)

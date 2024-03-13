@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://rsj36bkhf2x5"]
+
+[ext_resource type="Script" path="res://scenes/network_entity_registry.gd" id="1_4ixuw"]
+
+[node name="NetworkEntityRegistry" type="MultiplayerSpawner"]
+spawn_path = NodePath(".")
+script = ExtResource("1_4ixuw")
