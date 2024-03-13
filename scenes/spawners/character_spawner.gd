@@ -17,10 +17,20 @@ func spawn_character(data: Dictionary):
 		print("Spawning puppet")
 		character = ThirdPersonDisplayScene.instantiate()
 		character.position = position
-	#elif true:
-		#character = Character.new(position)
 	else:
 		character = kinematic_character_scene.instantiate()
 		character.position = position
 	character.name = str(id)
 	return character
+
+func filter_out_unspawned_entities_from_world_state(world_state: Dictionary):
+	var filtered_world_state = {}
+	for entity_id in get_entity_ids():
+		if entity_id in world_state:
+			filtered_world_state[entity_id] = world_state[entity_id].duplicate(true)
+
+func get_entity_ids() -> Dictionary:
+	var entity_ids = []
+	for child_node in get_children():
+		entity_ids.append(child_node.name)
+	return entity_ids

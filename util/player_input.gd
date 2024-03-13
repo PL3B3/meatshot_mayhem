@@ -7,7 +7,6 @@ var _is_jumping: bool
 var _direction: Vector2
 
 func _init(yaw: Vector3, pitch: Vector3, is_jumping: bool, direction: Vector2):
-	super()
 	_yaw = yaw
 	_pitch = pitch
 	_is_jumping = is_jumping

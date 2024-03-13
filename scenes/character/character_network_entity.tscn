@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://dxkyp7iubfeje"]
+
+[ext_resource type="PackedScene" uid="uid://c8jh8ru1xis61" path="res://scenes/character/character_first_person_display_output.tscn" id="1_etfjj"]
+[ext_resource type="PackedScene" uid="uid://14kdx16utr13" path="res://scenes/movement/character_movement_actuator.tscn" id="2_dx1ag"]
+
+[node name="CharacterNetworkEntity" type="Node"]
+
+[node name="CharacterFirstPersonDisplayOutput" parent="." instance=ExtResource("1_etfjj")]
+
+[node name="CharacterMovementActuator" parent="." instance=ExtResource("2_dx1ag")]

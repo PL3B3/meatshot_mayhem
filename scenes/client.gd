@@ -29,10 +29,23 @@ var last_received_server_state: Dictionary = NO_SERVER_STATE
 var latest_handled_tick: int = 0
 var warmed_up = false
 
+class PhysicsState:
+	var position_: Vector3
+	var velocity_: Vector3
+	var is_moving_along_floor_: bool
+	var bleb_ = 20
+	
+	func _init(position, velocity, is_moving_along_floor):
+		position_ = position
+		velocity_ = velocity
+		is_moving_along_floor_ = is_moving_along_floor
+		for property in get_property_list():
+			print(property)
+			print(property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE)
+
 func _ready():
+	PhysicsState.new(Vector3.ZERO, Vector3.ZERO, false)
 	resize_window()
-#	multiplayer.peer_connected.connect(_on_peer_connected)
-#	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_failed_to_connect_to_server)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
@@ -40,30 +53,14 @@ func _ready():
 	messenger.received_server_message.connect(_handle_server_message)
 	get_tree().create_timer(WARMUP_TIME).timeout.connect(func(): warmed_up = true)
 	LogsAndMetrics.add_client_stat("sim_error", 2, false)
-	#LogsAndMetrics.add_client_stat("usec_between_timer_sleeps", 2, true)
-	# done after wiring signals so we don't connect to server before spawn_function gets set
-	#var test_timer = Timer.new()
-	#test_timer.wait_time = 0.001
-	#test_timer.autostart = true
-	#test_timer.connect("timeout", func(): print("CURRTIME: ", Time.get_ticks_msec()))
-	#add_child(test_timer)
-	var thread = Thread.new()
-	#thread.start(_loop_wait)
 	start_client()
 
 func _process(delta):
-	#print("PROCESS CURRTIME: ", Time.get_ticks_usec())
 	if Input.is_action_just_pressed("toggle_window_mode"):
 		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		else:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-
-func _loop_wait():
-	while true:
-		OS.delay_msec(15)
-		#print("CURRTIME: ", Time.get_ticks_usec())
-		LogsAndMetrics.add_sample("usec_between_timer_sleeps", Time.get_ticks_usec())
 
 func _physics_process(delta):
 	if !warmed_up or client_character == null:
