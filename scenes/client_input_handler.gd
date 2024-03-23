@@ -22,6 +22,7 @@ func _unhandled_input(event):
 		elif Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
+# deprecating once migrate to new timeline based architecture
 func record_input_for_tick(tick) -> Dictionary:
 	var player_input = {
 		"yaw": _yaw, 
@@ -32,6 +33,15 @@ func record_input_for_tick(tick) -> Dictionary:
 	}
 	input_per_tick[tick] = player_input
 	return player_input
+
+func get_latest_input() -> InputState:
+	return InputState.new(
+		_yaw,
+		_pitch,
+		Input.is_action_pressed("jump"),
+		Input.is_action_pressed("slow"),
+		Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+	)
 
 func get_inputs_since_tick(initial_tick) -> Array:
 	var tick = initial_tick

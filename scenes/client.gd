@@ -5,17 +5,19 @@ var test_scene = preload("res://scenes/test_spawn.tscn")
 # _physics_process is called a bunch of times in quick succession on startup
 # so it will flood the server with like 8 messages, creating a megabuffer
 # set to 0 to disable, if you want the buffer
-const WARMUP_TIME = 0.0
+const WARMUP_TIME = 0.2
 const RECONCILIATION_SNAP_IF_ABOVE = 10.25
 const RECONCILIATION_SNAP_IF_BELOW = 0.001
 const RECONCILIATION_EXPONENTIAL_FALLOFF = 0.5
 const RECONCILIATION_VELOCITY_CORRECTION_FACTOR = 4.0
 const RECONCILIATION_POSITION_CORRECTION_FACTOR = 0.0
 const NO_SERVER_STATE = {"tick": -1}
+const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
 
 @onready var input_handler: ClientInputHandler = $ClientInputHandler
 @onready var character_spawner = $CharacterSpawner
 @onready var messenger: NetworkMessenger = $NetworkMessenger
+@onready var entity_registry_: NetworkEntityRegistry = $NetworkEntityRegistry
 
 var puppets: Dictionary = {}
 var client_character: CharacterMovementKinematicBody = null
@@ -29,52 +31,156 @@ var last_received_server_state: Dictionary = NO_SERVER_STATE
 var latest_handled_tick: int = 0
 var warmed_up = false
 
-class PhysicsState:
-	var position_: Vector3
-	var velocity_: Vector3
-	var is_moving_along_floor_: bool
-	var bleb_ = 20
-	
-	func _init(position, velocity, is_moving_along_floor):
-		position_ = position
-		velocity_ = velocity
-		is_moving_along_floor_ = is_moving_along_floor
-		for property in get_property_list():
-			print(property)
-			print(property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE)
+var world_state_timeline_: WorldStateTimeline = WorldStateTimeline.new()
+
+#class CharacterMovementSystem:
+static func compute_next_physics_state(
+	world_state_timeline: WorldStateTimeline,
+	entity_registry: NetworkEntityRegistry,
+	player_input: InputState) -> Dictionary:
+	var own_player_id: int = get_own_player_entity_id(entity_registry)
+	if own_player_id == Network.NO_ENTITY_ID:
+		return {}
+	var latest_player_state: Dictionary = world_state_timeline.get_current_entity_state(own_player_id)
+	if latest_player_state.is_empty():
+		return {}
+	#var player_input: InputState = latest_player_state[StateType.INPUT]
+	var current_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
+	var own_player_entity := entity_registry.get_entity(own_player_id) as CharacterNetworkEntity
+	var movement_calculator: CharacterMovementActuator = own_player_entity.get_movement_calculator()
+	return {
+		own_player_id: {
+			StateType.CHARACTER_PHYSICS: movement_calculator.compute_next_physics_state(current_physics_state, player_input),
+			StateType.INPUT: player_input
+		}
+	}
+	#Utils.default_if_absent(in_progress_next_state, own_player_id, {})[StateType.CHARACTER_PHYSICS] = (
+		#movement_calculator.compute_next_physics_state(current_physics_state, player_input))
+
+#class CharacterFirstPersonDisplaySystem:
+static func display_first_person(
+	world_state_timeline: WorldStateTimeline,
+	entity_registry: NetworkEntityRegistry):
+	var own_player_id: int = get_own_player_entity_id(entity_registry)
+	if own_player_id == Network.NO_ENTITY_ID:
+		return
+	var latest_player_state: Dictionary = world_state_timeline.get_current_entity_state(own_player_id)
+	if latest_player_state.is_empty():
+		return
+	var latest_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
+	var latest_input_state: InputState = latest_player_state[StateType.INPUT]
+	var own_player_entity := entity_registry.get_entity(own_player_id) as CharacterNetworkEntity
+	var first_person_display: CharacterFirstPersonOutput = own_player_entity.get_first_person_display()
+	first_person_display.display_character_state(
+		latest_physics_state.position(), 
+		latest_input_state.yaw(), 
+		latest_input_state.pitch())
+
+static func display_third_person(
+	world_state_timeline: WorldStateTimeline,
+	entity_registry: NetworkEntityRegistry):
+	for other_player_id in entity_registry.get_entity_ids_for_mode(CONSTANTS.NetworkEntityMode.OTHER_CLIENT):
+		var latest_player_state: Dictionary = world_state_timeline.get_current_entity_state(other_player_id)
+		if latest_player_state.is_empty():
+			continue
+		var latest_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
+		var latest_input_state: InputState = latest_player_state[StateType.INPUT]
+		var other_player_entity := entity_registry.get_entity(other_player_id) as CharacterNetworkEntity
+		var third_person_display: CharacterThirdPersonDisplay = other_player_entity.get_third_person_display()
+		third_person_display.display_character_state(
+			latest_physics_state.position(), 
+			latest_input_state.yaw(), 
+			latest_input_state.pitch())
+
+static func get_own_player_entity_id(entity_registry: NetworkEntityRegistry) -> int:
+	var my_possible_player_entity = entity_registry.get_entity_ids_for_mode(CONSTANTS.NetworkEntityMode.OWN_CLIENT)
+	if my_possible_player_entity.is_empty():
+		return Network.NO_ENTITY_ID
+	else:
+		return Utils.get_only_element_of_list(my_possible_player_entity)
+
+static func get_other_player_entity_ids(entity_registry: NetworkEntityRegistry) -> Array:
+	return entity_registry.get_entity_ids_for_mode(CONSTANTS.NetworkEntityMode.OTHER_CLIENT)
 
 func _ready():
-	PhysicsState.new(Vector3.ZERO, Vector3.ZERO, false)
+	#PhysicsState.new(Vector3.ZERO, Vector3.ZERO, false)
 	resize_window()
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_failed_to_connect_to_server)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	character_spawner.spawned.connect(_on_character_spawned)
 	messenger.received_server_message.connect(_handle_server_message)
+	entity_registry_.spawned.connect(_on_entity_spawned)
 	get_tree().create_timer(WARMUP_TIME).timeout.connect(func(): warmed_up = true)
-	LogsAndMetrics.add_client_stat("sim_error", 2, false)
+	LogsAndMetrics.add_client_stat("sim_error", 100)
+	LogsAndMetrics.add_client_stat(TIME_BETWEEN_PROCESS_CALLS_STAT, 5, true)
 	start_client()
 
+var phys_proc_counter = 0
 func _process(delta):
+	LogsAndMetrics.add_sample(TIME_BETWEEN_PROCESS_CALLS_STAT, Time.get_ticks_usec())
+	#print("Phys updates in frame: ", phys_proc_counter, " with delta ", delta)
+	phys_proc_counter = 0
 	if Input.is_action_just_pressed("toggle_window_mode"):
 		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		else:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	
+	display_first_person(world_state_timeline_, entity_registry_)
+	display_third_person(world_state_timeline_, entity_registry_)
+	
+	#if player_entity_ != null:
+		#var latest_player_state = world_state_timeline_.get_current_entity_state(player_entity_id_)
+		#var latest_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
+		#var latest_input_state: InputState = latest_player_state[StateType.INPUT]
+		#player_entity_.get_first_person_display().display_character_state(
+			#latest_physics_state.position(), 
+			#latest_input_state.yaw(), 
+			#latest_input_state.pitch())
 
 func _physics_process(delta):
-	if !warmed_up or client_character == null:
+	if !warmed_up:
 		return
-	if is_replay_enabled_:
-		replay()
-		return
-	#client_character.reconcile_server_state(last_received_server_state.duplicate(true), delta)
-	character_physics_state = reconcile_server_state(last_received_server_state.duplicate(true), delta)
-	var player_input: Dictionary = input_handler.record_input_for_tick(tick)
-	messenger.send_message_to_server({"input": player_input, "tick": tick})
-	character_physics_state = client_character.compute_next_physics_state(character_physics_state, player_input)
-	physics_state_per_tick[tick] = {"state": character_physics_state, "floor": null} # client_character.export_floor_contact
-	tick += 1
+	var next_world_state: Dictionary = {}
+	# enrich with server info
+	# predict player state 
+	var predicted_player_physics_state = compute_next_physics_state(
+		world_state_timeline_, entity_registry_, input_handler.get_latest_input())
+	messenger.send_message_to_server(
+		{
+			"input": input_handler.get_latest_input().to_dict(), 
+			"tick": world_state_timeline_.get_current_tick()
+		})
+	next_world_state.merge(predicted_player_physics_state, true)
+	world_state_timeline_.add_next_state(next_world_state)
+
+#var player_entity_: CharacterNetworkEntity = null
+#var player_entity_id_: int
+
+#func new_tick():
+	#var next_tick_state = {}
+	## enrich with input
+	#var current_input: InputState = input_handler.get_latest_input()
+	#Utils.default_if_absent(next_tick_state, player_entity_id_, {})[StateType.INPUT] = current_input
+	## copy last physics state
+	#var current_physics_state: CharacterPhysicsState = (
+		#world_state_timeline_.get_current_entity_state(player_entity_id_)[StateType.CHARACTER_PHYSICS])
+	#var actuator: CharacterMovementActuator = player_entity_.get_movement_calculator()
+	#Utils.default_if_absent(next_tick_state, player_entity_id_, {})[StateType.CHARACTER_PHYSICS] = (
+		#actuator.compute_next_physics_state(current_physics_state, current_input))
+	#world_state_timeline_.add_next_state(next_tick_state)
+	#pass
+
+func _on_entity_spawned(entity: Node):
+	#player_entity_ = entity as NetworkEntity
+	#player_entity_id_ = player_entity_.get_entity_id()
+	world_state_timeline_.add_next_state({
+		(entity as NetworkEntity).get_entity_id(): {
+			StateType.CHARACTER_PHYSICS: CharacterPhysicsState.new(Vector3(0, 5, 0), Vector3.ZERO, false),
+			StateType.INPUT: InputState.new(0, 0, false, false, Vector2(0, 0))
+		}
+	})
 
 func reconcile_server_state(latest_server_message: Dictionary, delta: float):
 	if is_reconciliation_enabled_ and latest_server_message["tick"] > latest_handled_tick:

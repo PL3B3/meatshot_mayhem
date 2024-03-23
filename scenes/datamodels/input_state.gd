@@ -50,3 +50,6 @@ static func from_dict(serialized_data: Dictionary):
 		serialized_data[INPUT_STATE_KEY.DIRECTION]
 	)
 	
+
+func _to_string():
+	return str(to_dict())

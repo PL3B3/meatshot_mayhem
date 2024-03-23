@@ -5,10 +5,16 @@ var rigid_character_scene = preload("res://scenes/movement/character_movement_ri
 var ThirdPersonDisplayScene = preload("res://scenes/character/third_person_display.tscn")
 var CharacterScene = preload("res://scenes/character/character.tscn")
 
-func _ready():
-	spawn_function = spawn_character
+"""
+Spawner and registrar of network entities
+Constructs the entity (it will automatically be added to scene)
+Also tells each entity its network mode (OTHER_CLIENT, SERVER, OWN_CLIENT)
+"""
 
-func spawn_character(data: Dictionary):
+func _ready():
+	spawn_function = spawn_entity
+
+func spawn_entity(data: Dictionary):
 	var position = data["position"]
 	var id = data["id"]
 	print("Spawn id: %s. Self id: %s." % [id, multiplayer.get_unique_id()])

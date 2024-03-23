@@ -35,3 +35,5 @@ static func from_dict(dict: Dictionary):
 		dict[CHARACTER_PHYSICS_STATE_KEY.IS_GROUNDED]
 	)
 
+func _to_string():
+	return str(to_dict())

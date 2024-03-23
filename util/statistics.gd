@@ -30,6 +30,8 @@ func _ready():
 	timer.start()
 
 func add_sample(raw_sample):
+	if !should_display(network_mode_):
+		return
 	if use_diff_:
 		if last_value_.is_empty():
 			last_value_.push_back(raw_sample)
@@ -42,10 +44,9 @@ func add_sample(raw_sample):
 
 func print_and_clear_stats():
 	if !should_display(network_mode_):
-		samples_.clear()
 		return
 	if samples_.is_empty():
-		print("%s: cannot calculate statistics: no samples" % [statistic_name_])
+		print_with_network_role("%s: cannot calculate statistics: no samples" % statistic_name_)
 		return
 	samples_.sort()
 	var max = samples_[-1]
@@ -54,9 +55,10 @@ func print_and_clear_stats():
 	var mean = samples_.reduce(func(accum, sample): return accum + (sample / float(samples_.size())), 0.0)
 	var total_variance = samples_.reduce(func(curr_total, sample): return curr_total + pow(sample - mean, 2), 0.0)
 	var std_dev = sqrt(total_variance / max(1.0, samples_.size() - 1.0))
-	var stat_blurb = "%s: median: %.3f, mean: %.3f, std_dev: %.3f, min: %.3f, max: %.3f" % [statistic_name_, median, mean, std_dev, min, max]
+	var stat_blurb = "%s: median: %.3f, mean: %.3f, std_dev: %.3f, min: %.3f, max: %.3f" % [
+		statistic_name_, median, mean, std_dev, min, max]
 	new_statistic_calculated.emit(stat_blurb)
-	print(stat_blurb)
+	print_with_network_role(stat_blurb)
 	samples_.clear()
 
 func network_mode():
@@ -73,3 +75,12 @@ func should_display(network_mode):
 		_:
 			print("%s is not a valid value of NetworkLogMode. Not displaying log or stat" % network_mode)
 			return false
+
+func print_with_network_role(message: String):
+	print("%s %s" % [get_network_role_descriptor(), message])
+
+func get_network_role_descriptor():
+	if multiplayer.is_server():
+		return "<SV::::::::::::>"
+	else:
+		return "<CL::%d>" % multiplayer.get_unique_id()

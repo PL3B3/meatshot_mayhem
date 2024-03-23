@@ -13,16 +13,13 @@ config_version=5
 config/name="MeatshotMayhem"
 run/main_scene="res://scenes/root.tscn"
 config/features=PackedStringArray("4.2", "Forward Plus")
+run/max_fps=60
 config/icon="res://icon.svg"
 
 [autoload]
 
 LogsAndMetrics="*res://util/logs_and_metrics.tscn"
 Logger="*res://addons/godot-logger/logger.gd"
-
-[display]
-
-window/vsync/vsync_mode=0
 
 [editor_plugins]
 
