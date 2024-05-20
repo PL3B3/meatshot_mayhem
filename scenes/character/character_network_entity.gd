@@ -19,7 +19,11 @@ func _init(entity_id, network_mode):
 
 func _ready():
 	match network_mode_:
-		CONSTANTS.NetworkEntityMode.SERVER, CONSTANTS.NetworkEntityMode.OWN_CLIENT:
+		CONSTANTS.NetworkEntityMode.SERVER:
+			__add_movement_calculator()
+			__add_first_person_display()
+			__add_third_person_display()
+		CONSTANTS.NetworkEntityMode.OWN_CLIENT: 
 			__add_movement_calculator()
 			__add_first_person_display()
 		CONSTANTS.NetworkEntityMode.OTHER_CLIENT:

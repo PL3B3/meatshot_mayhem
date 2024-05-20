@@ -16,3 +16,14 @@ static func compute_if_absent(dict: Dictionary, key, compute_func):
 	if not key in dict:
 		dict[key] = compute_func.call(key)
 	return dict[key]
+
+static func default_dict_if_absent(dict: Dictionary, key):
+	if not key in dict:
+		dict[key] = {}
+	var existing_dictionary_for_key = dict[key]
+	assert(
+		existing_dictionary_for_key is Dictionary, 
+		"Expected dictionary value %s for key %s to be of type Dictionary" % [
+			existing_dictionary_for_key, key])
+	return existing_dictionary_for_key
+

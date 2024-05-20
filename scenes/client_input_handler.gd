@@ -43,9 +43,20 @@ func get_latest_input() -> InputState:
 		Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	)
 
-func get_inputs_since_tick(initial_tick) -> Array:
+func get_and_record_latest_input(tick: int) -> InputState:
+	var player_input := InputState.new(
+		_yaw,
+		_pitch,
+		Input.is_action_pressed("jump"),
+		Input.is_action_pressed("slow"),
+		Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+	)
+	input_per_tick[tick] = player_input
+	return player_input
+
+func get_inputs_since_tick(initial_tick) -> Array[InputState]:
 	var tick = initial_tick
-	var inputs_since_tick = []
+	var inputs_since_tick: Array[InputState] = []
 	while input_per_tick.has(tick):
 		inputs_since_tick.push_back(input_per_tick.get(tick))
 		tick += 1

@@ -1,321 +1,35 @@
 extends Node
-
-var test_scene = preload("res://scenes/test_spawn.tscn")
+class_name Client
 
 # _physics_process is called a bunch of times in quick succession on startup
 # so it will flood the server with like 8 messages, creating a megabuffer
 # set to 0 to disable, if you want the buffer
 const WARMUP_TIME = 0.2
-const RECONCILIATION_SNAP_IF_ABOVE = 10.25
+const RECONCILIATION_SNAP_IF_ABOVE = 11.0
 const RECONCILIATION_SNAP_IF_BELOW = 0.001
-const RECONCILIATION_EXPONENTIAL_FALLOFF = 0.5
-const RECONCILIATION_VELOCITY_CORRECTION_FACTOR = 4.0
-const RECONCILIATION_POSITION_CORRECTION_FACTOR = 0.0
-const NO_SERVER_STATE = {"tick": -1}
+const RECONCILIATION_POSITION_CORRECTION_SPEED_CAP_UNITS_PER_TICK = 0.2
+const RECONCILIATION_POSITION_CORRECTION_LINEAR_FRACTION = 0.15
+const RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION = 0.5
+const RECONCILIATION_MAX_TICKS_REPLAYED = 16
 const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
 
-@onready var input_handler: ClientInputHandler = $ClientInputHandler
-@onready var character_spawner = $CharacterSpawner
-@onready var messenger: NetworkMessenger = $NetworkMessenger
+@onready var input_handler_: ClientInputHandler = $ClientInputHandler
+@onready var network_messenger_: NetworkMessenger = $NetworkMessenger
 @onready var entity_registry_: NetworkEntityRegistry = $NetworkEntityRegistry
+@onready var debug_label_: Label = $DebugLabel
 
-var puppets: Dictionary = {}
-var client_character: CharacterMovementKinematicBody = null
-var character_physics_state: Dictionary = {}
-var physics_state_per_tick: Dictionary = {}
-var tick = 0
-
-var is_reconciliation_enabled_ = true
-var is_replay_enabled_ = false
-var last_received_server_state: Dictionary = NO_SERVER_STATE
-var latest_handled_tick: int = 0
+var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
+var client_state_buffer_: RefillingQueue
 var warmed_up = false
 
-var world_state_timeline_: WorldStateTimeline = WorldStateTimeline.new()
-
-#class CharacterMovementSystem:
-static func compute_next_physics_state(
-	world_state_timeline: WorldStateTimeline,
-	entity_registry: NetworkEntityRegistry,
-	player_input: InputState) -> Dictionary:
-	var own_player_id: int = get_own_player_entity_id(entity_registry)
-	if own_player_id == Network.NO_ENTITY_ID:
-		return {}
-	var latest_player_state: Dictionary = world_state_timeline.get_current_entity_state(own_player_id)
-	if latest_player_state.is_empty():
-		return {}
-	#var player_input: InputState = latest_player_state[StateType.INPUT]
-	var current_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
-	var own_player_entity := entity_registry.get_entity(own_player_id) as CharacterNetworkEntity
-	var movement_calculator: CharacterMovementActuator = own_player_entity.get_movement_calculator()
-	return {
-		own_player_id: {
-			StateType.CHARACTER_PHYSICS: movement_calculator.compute_next_physics_state(current_physics_state, player_input),
-			StateType.INPUT: player_input
-		}
-	}
-	#Utils.default_if_absent(in_progress_next_state, own_player_id, {})[StateType.CHARACTER_PHYSICS] = (
-		#movement_calculator.compute_next_physics_state(current_physics_state, player_input))
-
-#class CharacterFirstPersonDisplaySystem:
-static func display_first_person(
-	world_state_timeline: WorldStateTimeline,
-	entity_registry: NetworkEntityRegistry):
-	var own_player_id: int = get_own_player_entity_id(entity_registry)
-	if own_player_id == Network.NO_ENTITY_ID:
-		return
-	var latest_player_state: Dictionary = world_state_timeline.get_current_entity_state(own_player_id)
-	if latest_player_state.is_empty():
-		return
-	var latest_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
-	var latest_input_state: InputState = latest_player_state[StateType.INPUT]
-	var own_player_entity := entity_registry.get_entity(own_player_id) as CharacterNetworkEntity
-	var first_person_display: CharacterFirstPersonOutput = own_player_entity.get_first_person_display()
-	first_person_display.display_character_state(
-		latest_physics_state.position(), 
-		latest_input_state.yaw(), 
-		latest_input_state.pitch())
-
-static func display_third_person(
-	world_state_timeline: WorldStateTimeline,
-	entity_registry: NetworkEntityRegistry):
-	for other_player_id in entity_registry.get_entity_ids_for_mode(CONSTANTS.NetworkEntityMode.OTHER_CLIENT):
-		var latest_player_state: Dictionary = world_state_timeline.get_current_entity_state(other_player_id)
-		if latest_player_state.is_empty():
-			continue
-		var latest_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
-		var latest_input_state: InputState = latest_player_state[StateType.INPUT]
-		var other_player_entity := entity_registry.get_entity(other_player_id) as CharacterNetworkEntity
-		var third_person_display: CharacterThirdPersonDisplay = other_player_entity.get_third_person_display()
-		third_person_display.display_character_state(
-			latest_physics_state.position(), 
-			latest_input_state.yaw(), 
-			latest_input_state.pitch())
-
-static func get_own_player_entity_id(entity_registry: NetworkEntityRegistry) -> int:
-	var my_possible_player_entity = entity_registry.get_entity_ids_for_mode(CONSTANTS.NetworkEntityMode.OWN_CLIENT)
-	if my_possible_player_entity.is_empty():
-		return Network.NO_ENTITY_ID
-	else:
-		return Utils.get_only_element_of_list(my_possible_player_entity)
-
-static func get_other_player_entity_ids(entity_registry: NetworkEntityRegistry) -> Array:
-	return entity_registry.get_entity_ids_for_mode(CONSTANTS.NetworkEntityMode.OTHER_CLIENT)
-
 func _ready():
-	#PhysicsState.new(Vector3.ZERO, Vector3.ZERO, false)
 	resize_window()
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
-	multiplayer.connection_failed.connect(_on_failed_to_connect_to_server)
-	multiplayer.server_disconnected.connect(_on_server_disconnected)
-	character_spawner.spawned.connect(_on_character_spawned)
-	messenger.received_server_message.connect(_handle_server_message)
-	entity_registry_.spawned.connect(_on_entity_spawned)
+	network_messenger_.received_server_message.connect(_handle_server_message)
 	get_tree().create_timer(WARMUP_TIME).timeout.connect(func(): warmed_up = true)
-	LogsAndMetrics.add_client_stat("sim_error", 100)
-	LogsAndMetrics.add_client_stat(TIME_BETWEEN_PROCESS_CALLS_STAT, 5, true)
+	LogsAndMetrics.add_client_stat("sim_error", 1000)
+	LogsAndMetrics.add_client_stat(TIME_BETWEEN_PROCESS_CALLS_STAT, 1000, true)
 	start_client()
-
-var phys_proc_counter = 0
-func _process(delta):
-	LogsAndMetrics.add_sample(TIME_BETWEEN_PROCESS_CALLS_STAT, Time.get_ticks_usec())
-	#print("Phys updates in frame: ", phys_proc_counter, " with delta ", delta)
-	phys_proc_counter = 0
-	if Input.is_action_just_pressed("toggle_window_mode"):
-		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
-		else:
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-	
-	display_first_person(world_state_timeline_, entity_registry_)
-	display_third_person(world_state_timeline_, entity_registry_)
-	
-	#if player_entity_ != null:
-		#var latest_player_state = world_state_timeline_.get_current_entity_state(player_entity_id_)
-		#var latest_physics_state: CharacterPhysicsState = latest_player_state[StateType.CHARACTER_PHYSICS]
-		#var latest_input_state: InputState = latest_player_state[StateType.INPUT]
-		#player_entity_.get_first_person_display().display_character_state(
-			#latest_physics_state.position(), 
-			#latest_input_state.yaw(), 
-			#latest_input_state.pitch())
-
-func _physics_process(delta):
-	if !warmed_up:
-		return
-	var next_world_state: Dictionary = {}
-	# enrich with server info
-	# predict player state 
-	var predicted_player_physics_state = compute_next_physics_state(
-		world_state_timeline_, entity_registry_, input_handler.get_latest_input())
-	messenger.send_message_to_server(
-		{
-			"input": input_handler.get_latest_input().to_dict(), 
-			"tick": world_state_timeline_.get_current_tick()
-		})
-	next_world_state.merge(predicted_player_physics_state, true)
-	world_state_timeline_.add_next_state(next_world_state)
-
-#var player_entity_: CharacterNetworkEntity = null
-#var player_entity_id_: int
-
-#func new_tick():
-	#var next_tick_state = {}
-	## enrich with input
-	#var current_input: InputState = input_handler.get_latest_input()
-	#Utils.default_if_absent(next_tick_state, player_entity_id_, {})[StateType.INPUT] = current_input
-	## copy last physics state
-	#var current_physics_state: CharacterPhysicsState = (
-		#world_state_timeline_.get_current_entity_state(player_entity_id_)[StateType.CHARACTER_PHYSICS])
-	#var actuator: CharacterMovementActuator = player_entity_.get_movement_calculator()
-	#Utils.default_if_absent(next_tick_state, player_entity_id_, {})[StateType.CHARACTER_PHYSICS] = (
-		#actuator.compute_next_physics_state(current_physics_state, current_input))
-	#world_state_timeline_.add_next_state(next_tick_state)
-	#pass
-
-func _on_entity_spawned(entity: Node):
-	#player_entity_ = entity as NetworkEntity
-	#player_entity_id_ = player_entity_.get_entity_id()
-	world_state_timeline_.add_next_state({
-		(entity as NetworkEntity).get_entity_id(): {
-			StateType.CHARACTER_PHYSICS: CharacterPhysicsState.new(Vector3(0, 5, 0), Vector3.ZERO, false),
-			StateType.INPUT: InputState.new(0, 0, false, false, Vector2(0, 0))
-		}
-	})
-
-func reconcile_server_state(latest_server_message: Dictionary, delta: float):
-	if is_reconciliation_enabled_ and latest_server_message["tick"] > latest_handled_tick:
-		var inputs_since_state_tick = input_handler.get_inputs_since_tick(latest_server_message.tick + 1)
-		var predicted_state: Dictionary = physics_state_per_tick[tick - 1].state
-		var simulated_state = simulate(latest_server_message, inputs_since_state_tick, predicted_state, delta)
-		var position_error = simulated_state["position"] - predicted_state["position"]
-		var velocity_error = simulated_state["velocity"] - predicted_state["velocity"]
-		LogsAndMetrics.add_sample("sim_error", position_error.length())
-		latest_handled_tick = latest_server_message["tick"]
-		last_received_server_state = NO_SERVER_STATE
-		if position_error.length() > RECONCILIATION_SNAP_IF_ABOVE or position_error.length() < RECONCILIATION_SNAP_IF_BELOW:
-			return simulated_state
-		else:
-			var corrected_state = predicted_state.duplicate()
-			corrected_state.position = corrected_state.position.lerp(simulated_state.position, 0.15)
-			corrected_state.velocity = simulated_state.velocity
-			return corrected_state
-			# (reconciliation_vector_ * RECONCILIATION_EXPONENTIAL_FALLOFF) + (position_error * (1 - RECONCILIATION_EXPONENTIAL_FALLOFF))
-			#character_physics_state.velocity = character_physics_state.velocity + velocity_error * 0.2
-			#var corrected_state = predicted_state.duplicate()
-			#corrected_state["velocity"] = simulated_state["velocity"] + (reconciliation_vector_ * RECONCILIATION_VELOCITY_CORRECTION_FACTOR)
-			#corrected_state["position"] = corrected_state["position"] + (reconciliation_vector_ * RECONCILIATION_POSITION_CORRECTION_FACTOR)
-			#print("rec vec: ", reconciliation_vector_)
-			#print("pred: ", predicted_state)
-			#print("corr: ", corrected_state)
-			#character_physics_state = corrected_state
-		#if position_error.length() > 0.25:
-			#print("predstate: ", predicted_state)
-			#print("sim state: ", simulated_state)
-			#print("sv    msg: ", last_received_server_state)
-			#print("sim ticks: ", inputs_since_state_tick.size())
-	else:
-		return character_physics_state
-
-func simulate(latest_server_message: Dictionary, inputs_since_state_tick: Array, current_physics_state: Dictionary, delta: float):
-#	print("blep")
-	var states_to_print = []
-	states_to_print.push_back(physics_state_per_tick[latest_server_message.tick])
-	# server state with tick X is from after input X has been processed. So next input is X+1 
-	var simulation_state = latest_server_message.state
-	states_to_print.push_back(latest_server_message)
-	for simulation_input in inputs_since_state_tick:
-		#simulation_state = client_character.move(simulation_state, simulation_input, delta)
-		simulation_state = client_character.compute_next_physics_state(simulation_state, simulation_input)
-		states_to_print.push_back(simulation_input)
-		states_to_print.push_back(simulation_state)
-	states_to_print.push_back(current_physics_state)
-	var error = (current_physics_state.position - simulation_state.position).length()
-	#if error > 0.01:
-		#print_replay_string(states_to_print)
-		#print(Time.get_unix_time_from_system())
-		#print("initial state: ", states_to_print.pop_front())
-		#print("server  state: ", states_to_print.pop_front())
-		#while states_to_print.size() > 1:
-			#print("simul   input: ", states_to_print.pop_front())
-			#print("simul   state: ", states_to_print.pop_front())
-		#print("current state: ", states_to_print.pop_front())
-		#print("error        : ", error)
-		#print("current  tick: ", tick)
-	return simulation_state
-
-func replay():
-	"""
-	initial state: { "state": { "velocity": (-3.253312, 1.662395, 12.52345), "position": (12.34433, 2.528003, -20.23211), "is_moving_along_floor": true }, "floor": <null> }
-	server  state: { "velocity": (-3.253312, 1.662395, 12.52345), "position": (12.34433, 2.528003, -20.23211), "is_moving_along_floor": true }
-	simul   input: { "yaw": 69.7000000000016, "pitch": -9.84999999999985, "is_jumping": false, "is_slow_walking": false, "direction": (-0.707107, -0.707107) }
-	simul   state: { "velocity": (-4.152638, 2.039824, 12.83182), "position": (12.27584, 2.53448, -20.01805), "is_moving_along_floor": true }
-	simul   input: { "yaw": 67.8000000000016, "pitch": -9.79999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (-0.707107, -0.707107) }
-	simul   state: { "velocity": (-7.301629, 30.30303, 12.30783), "position": (12.15415, 3.03953, -19.81292), "is_moving_along_floor": false }
-	simul   input: { "yaw": 65.5500000000016, "pitch": -9.64999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (-0.707107, -0.707107) }
-	simul   state: { "velocity": (-9.986217, 30.30303, 11.71913), "position": (11.98771, 3.544581, -19.6176), "is_moving_along_floor": false }
-	simul   input: { "yaw": 63.1000000000016, "pitch": -9.64999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (-0.707107, -0.707107) }
-	simul   state: { "velocity": (-11.04252, 28.77257, 11.68186), "position": (11.80367, 4.024124, -19.4229), "is_moving_along_floor": false }
-	simul   input: { "yaw": 59.1000000000016, "pitch": -9.64999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (0, -1) }
-	simul   state: { "velocity": (-12.97788, 27.24212, 10.20793), "position": (11.58737, 4.478159, -19.25277), "is_moving_along_floor": false }
-	simul   input: { "yaw": 56.2500000000016, "pitch": -9.64999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (0, -1) }
-	simul   state: { "velocity": (-14.64069, 25.71166, 8.673415), "position": (11.34336, 4.906687, -19.10821), "is_moving_along_floor": false }
-	simul   input: { "yaw": 53.4000000000016, "pitch": -9.64999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (0, -1) }
-	simul   state: { "velocity": (-16.06124, 24.1812, 7.103917), "position": (11.07567, 5.309707, -18.98981), "is_moving_along_floor": false }
-	simul   input: { "yaw": 50.6500000000016, "pitch": -9.64999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (0.707107, -0.707107) }
-	simul   state: { "velocity": (-16.26135, 22.65075, 5.081247), "position": (10.80465, 5.687219, -18.90512), "is_moving_along_floor": false }
-	simul   input: { "yaw": 47.0500000000016, "pitch": -9.64999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (0.707107, -0.707107) }
-	simul   state: { "velocity": (-16.33169, 21.12029, 3.116086), "position": (10.53246, 6.039224, -18.85319), "is_moving_along_floor": false }
-	simul   input: { "yaw": 44.9000000000016, "pitch": -9.84999999999985, "is_jumping": true, "is_slow_walking": false, "direction": (0.707107, -0.707107) }
-	simul   state: { "velocity": (-16.32842, 19.58983, 1.239783), "position": (10.26032, 6.365721, -18.83253), "is_moving_along_floor": false }
-	simul   input: { "yaw": 42.9500000000016, "pitch": -10.0499999999998, "is_jumping": true, "is_slow_walking": false, "direction": (0.707107, -0.707107) }
-	simul   state: { "velocity": (-16.26445, 18.05938, -0.547279), "position": (9.989242, 6.666711, -18.84165), "is_moving_along_floor": false }
-	simul   input: { "yaw": 41.3500000000016, "pitch": -10.2999999999998, "is_jumping": true, "is_slow_walking": false, "direction": (1, 0) }
-	simul   state: { "velocity": (-14.42036, 16.52892, -2.170203), "position": (9.748902, 6.942193, -18.87782), "is_moving_along_floor": false }
-	current state: { "velocity": (-15.45897, 16.52892, -2.512219), "position": (9.508314, 6.942262, -18.95387), "is_moving_along_floor": false }
-	error        : 0.25232231616974
-	"""
-	if !is_replay_enabled_:
-		return
-	var rng = RandomNumberGenerator.new()
-	var arbitrarily_high_tick = 99999
-	physics_state_per_tick[arbitrarily_high_tick] = {}
-	var begin_state_client = { "velocity": Vector3(12.08496, 0.019526, -0.023346), "position": Vector3(23.16863, 2.500325, -26.49515), "is_moving_along_floor": true }
-	var begin_state_server = { "velocity": Vector3(12.08496, 0.019526, -0.023346), "position": Vector3(23.16863, 2.500325, -26.49515), "is_moving_along_floor": true }
-	var inputs = [
-		{ "yaw": 331.5, "pitch": 4.55, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.5, "pitch": 4.65, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.5, "pitch": 4.75, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.5, "pitch": 4.85, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.5, "pitch": 5, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.45, "pitch": 5.1, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.4, "pitch": 5.2, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.35, "pitch": 5.3, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.25, "pitch": 5.4, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.15, "pitch": 5.5, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331.05, "pitch": 5.6, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 331, "pitch": 5.65, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 330.95, "pitch": 5.7, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 330.95, "pitch": 5.7, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 330.95, "pitch": 5.75, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 330.95, "pitch": 5.75, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 330.85, "pitch": 5.75, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) },
-		{ "yaw": 330.65, "pitch": 5.85, "is_jumping": false, "is_slow_walking": false, "direction": Vector2(0, -1) }
-	]
-	var prior_simulated_state = { "velocity": Vector3(15.38109, 9.255051, -11.82438), "position": Vector3(27.31496, 2.811703, -27.95316), "is_moving_along_floor": true }
-	var prior_predicted_state = { "velocity": Vector3(15.61088, 7.851548, -11.47076), "position": Vector3(27.3567, 2.681525, -27.87867), "is_moving_along_floor": true }
-	var begin_state = begin_state_server
-	var expected_state = prior_simulated_state
-	var delta = 1.0 / 60
-	for i in 1:
-		if rng.randf() < 0.9:
-			return
-		var fuzz_size = 0.001
-		var fuzzed_begin_state = begin_state.duplicate(true)
-		fuzzed_begin_state.position += Vector3(rng.randf_range(-fuzz_size, fuzz_size), rng.randf_range(-fuzz_size, fuzz_size), rng.randf_range(-fuzz_size, fuzz_size))
-		var sim_result = simulate({"tick": arbitrarily_high_tick, "state": fuzzed_begin_state}, inputs, expected_state, delta)
-		var error_size = (sim_result.position - expected_state.position).length()
-		if error_size > -0.1:
-			print("err size: ", error_size)
 
 func start_client():
 	var peer = ENetMultiplayerPeer.new()
@@ -325,44 +39,17 @@ func start_client():
 	multiplayer.multiplayer_peer = peer
 	print("PEERS COUNT: ", multiplayer.get_peers().size())
 
+@rpc("authority", "call_local", "reliable")
 func resize_window(index=0):
 	var screen_size: Vector2 = DisplayServer.screen_get_size()
-	#get_window().size = Vector2(screen_size.x, screen_size.y)
-	#get_window().position = Vector2(0, 0)
 	get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
-	get_window().position = Vector2(index * (screen_size.x / 2), 0)
-
-func print_replay_string(original_states):
-	var states_to_print = original_states.duplicate()
-	print("####### REPLAY START ######")
-	print("var begin_state_client = ", convert_to_dict_literal(states_to_print.pop_front().state))
-	print("var begin_state_server = ", convert_to_dict_literal(states_to_print.pop_front().state))
-	print("var inputs = [")
-	while states_to_print.size() > 3:
-		print("\t", convert_to_dict_literal(states_to_print.pop_front()), ",")
-		states_to_print.pop_front()
-	print("\t", convert_to_dict_literal(states_to_print.pop_front()))
-	print("]")
-	print("var prior_simulated_state = ", convert_to_dict_literal(states_to_print.pop_front()))
-	print("var prior_predicted_state = ", convert_to_dict_literal(states_to_print.pop_front()))
-	print("####### REPLAY END ######")
+	get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
 
 func _handle_server_message(message: Dictionary):
-	match message.type:
-		Network.MessageType.RESIZE:
-			resize_window(message["resize"])
-		Network.MessageType.PLAYER_STATE:
-			last_received_server_state = message
-		Network.MessageType.PUPPET_STATE:
-			puppets[message.puppet_id].add_state(message)
-
-func _on_character_spawned(character: Node):
-	var client_id = int(str(character.name))
-	if client_id == multiplayer.get_unique_id():
-		character_physics_state = character.starting_physics_state()
-		client_character = character
-	else:
-		puppets[client_id] = character
+	var server_snapshot := ServerToClientStateSnapshotMessage.from_dict(message)
+	client_state_buffer_.push(server_snapshot)
+	if !client_state_timeline_.has_states():
+		client_state_timeline_.add_next_state(server_snapshot.client_state_snapshot())
 
 func _on_peer_connected(id: int):
 	print("Peer with id ", id, " connected")
@@ -371,27 +58,191 @@ func _on_peer_disconnected(id: int):
 	print("Peer with id ", id, " disconnected")
 
 func _on_connected_to_server():
-	pass
-	
-func _on_failed_to_connect_to_server():
-	pass
-	
-func _on_server_disconnected():
-	pass
+	debug_label_.text = "CLIENT %d" % multiplayer.get_unique_id()
+	client_state_buffer_ = RefillingQueue.new("cl_state_buf[%10d]" % multiplayer.get_unique_id(), true)
 
-static func convert_to_dict_literal(state_dict):
-	var dict_literal = "{ "
-	var items = []
-	for key in state_dict:
-		var value = state_dict[key]
-		var value_in_gdscript_form
-		if typeof(value) == TYPE_VECTOR3:
-			value_in_gdscript_form = "Vector3%s" % value
-		elif typeof(value) == TYPE_VECTOR2:
-			value_in_gdscript_form = "Vector2%s" % value
+func _process(_delta):
+	LogsAndMetrics.add_sample(TIME_BETWEEN_PROCESS_CALLS_STAT, Time.get_ticks_usec())
+	if Input.is_action_just_pressed("toggle_window_mode"):
+		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		else:
-			value_in_gdscript_form = str(value)
-		items.append("\"%s\": %s" % [key, value_in_gdscript_form])
-	dict_literal += ", ".join(items)
-	dict_literal += " }"
-	return dict_literal
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+
+func _physics_process(_delta):
+	if !warmed_up:
+		return
+	if !client_state_timeline_.has_states():
+		print("No starting state. Will not compute game tick.")
+		return
+	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
+	var own_character_entity: CharacterNetworkEntity = entity_registry_.get_own_player_entity()
+	if own_character_entity == null:
+		print("Character entity object not initialized. Will not compute game tick.")
+		return
+	var latest_input: InputState = input_handler_.get_and_record_latest_input(client_state_timeline_.get_next_tick())
+	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state()
+	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
+		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
+	
+	var latest_remote_character_state_per_entity_id: Dictionary
+	var reconciliation_data: Optional
+	var latest_server_snapshot_item: QueueItem = __get_latest_queued_authoritative_state_snapshot()
+	if latest_server_snapshot_item.is_valid():
+		var latest_server_state_snapshot: ServerToClientStateSnapshotMessage = latest_server_snapshot_item.value()
+		latest_remote_character_state_per_entity_id = (
+			latest_server_state_snapshot.client_state_snapshot().remote_character_states())
+		if latest_server_state_snapshot.client_tick() != Network.NO_TICK:
+			reconciliation_data = Optional.of(
+				ReconciliationData.from_server_to_client_snapshot(latest_server_state_snapshot))
+		else:
+			reconciliation_data = Optional.empty()
+	else:
+		latest_remote_character_state_per_entity_id = current_state.remote_character_states()
+		reconciliation_data = Optional.empty()
+	
+	var remote_character_resources: Array[RemoteCharacterResource] = []
+	for remote_character_entity_id in latest_remote_character_state_per_entity_id:
+		var remote_character_state: CharacterTransformState = (
+			latest_remote_character_state_per_entity_id[remote_character_entity_id])
+		var remote_character_network_entity: CharacterNetworkEntity = (
+			entity_registry_.get_entity(remote_character_entity_id))
+		if remote_character_network_entity == null:
+			print("No character network entity for remote character with id %d. Skipping game tick.")
+			return
+		var remote_character_resource: RemoteCharacterResource = RemoteCharacterResource.new(
+			remote_character_state, remote_character_network_entity.get_third_person_display())
+		remote_character_resources.push_back(remote_character_resource)
+
+	var optionally_reconciled_own_character_physics_state: CharacterPhysicsState = (
+		__reconcile_own_character_physics_state_with_authoritative_state(
+			reconciliation_data, 
+			own_character_physics_state, 
+			own_character_entity.get_movement_calculator(), 
+			client_state_timeline_.get_current_tick()))
+	
+	__display_own_character(own_character_transform_state, own_character_entity.get_first_person_display())
+	__display_remote_characters(remote_character_resources)
+	var next_own_character_physics_state: CharacterPhysicsState = __compute_next_physics_state(
+		optionally_reconciled_own_character_physics_state, 
+		own_character_entity.get_movement_calculator(), 
+		latest_input)
+	
+	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
+		next_own_character_physics_state, current_state.remote_character_states())
+	client_state_timeline_.add_next_state(next_state)
+	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
+	network_messenger_.send_message_to_server({
+		"input": latest_input.to_dict(), 
+		"tick": tick_for_state_computed_using_latest_input
+	})
+
+func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
+	if client_state_buffer_ == null:
+		return QueueItem.DUMMY_ITEM
+	return client_state_buffer_.pop()
+
+func __reconcile_own_character_physics_state_with_authoritative_state(
+	optional_reconciliation_data: Optional,
+	predicted_player_physics_state: CharacterPhysicsState, 
+	character_movement_calculator: CharacterMovementActuator,
+	current_tick: int) -> CharacterPhysicsState:
+	if optional_reconciliation_data.is_present():
+		var authoritative_physics_state_and_tick: ReconciliationData = optional_reconciliation_data.value()
+		var reconciliation_replay_start_tick
+		if authoritative_physics_state_and_tick.client_tick() < current_tick - RECONCILIATION_MAX_TICKS_REPLAYED:
+			print("Server state with tick %d is too old to replay all inputs since. Replaying last %d inputs." % [
+				authoritative_physics_state_and_tick.client_tick, RECONCILIATION_MAX_TICKS_REPLAYED])
+			reconciliation_replay_start_tick = current_tick - RECONCILIATION_MAX_TICKS_REPLAYED
+		else:
+			reconciliation_replay_start_tick = authoritative_physics_state_and_tick.client_tick() + 1
+		var simulated_authoritative_physics_state: CharacterPhysicsState = __replay_physics_computation_using_inputs(
+			authoritative_physics_state_and_tick.physics_state(),
+			input_handler_.get_inputs_since_tick(reconciliation_replay_start_tick),
+			character_movement_calculator)
+		var corrected_state = __correct_predicted_physics_state_towards_simulated_authoritative_state(
+			predicted_player_physics_state, simulated_authoritative_physics_state)
+		#print("sim vel: %s. pred vel: %s" % [simulated_state.velocity(), predicted_state.velocity()])
+		#print("reconcile with state %s for tick %d. inputs: %s" % [
+			#own_player_server_state.state(), 
+			#own_player_server_state.tick(),
+			#input_handler_.get_inputs_since_tick(own_player_server_state.tick())])
+		return corrected_state
+	else:
+		return predicted_player_physics_state
+
+func __correct_predicted_physics_state_towards_simulated_authoritative_state(
+	predicted_state: CharacterPhysicsState, 
+	simulated_state: CharacterPhysicsState) -> CharacterPhysicsState:
+	var position_error: Vector3 = simulated_state.position() - predicted_state.position()
+	var velocity_error: Vector3 = simulated_state.velocity() - predicted_state.velocity()
+	# print("position err: %+00.4f. velocity err: %+00.4f" % [position_error.length(), velocity_error.length()])
+	if (position_error.length() > RECONCILIATION_SNAP_IF_ABOVE 
+		or position_error.length() < RECONCILIATION_SNAP_IF_BELOW):
+		return simulated_state
+	else:
+		var position_correction_direction: Vector3 = position_error.normalized()
+		var position_correction_magnitude: float = min(
+			RECONCILIATION_POSITION_CORRECTION_SPEED_CAP_UNITS_PER_TICK,
+			RECONCILIATION_POSITION_CORRECTION_LINEAR_FRACTION * position_error.length())
+		var corrected_position: Vector3 = (
+			predicted_state.position() + position_correction_magnitude * position_correction_direction)
+		var corrected_velocity = predicted_state.velocity().lerp(
+			simulated_state.velocity(), RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION)
+		return CharacterPhysicsState.new(corrected_position, corrected_velocity, simulated_state.is_grounded())
+
+static func __compute_next_physics_state(
+	current_physics_state: CharacterPhysicsState,
+	movement_calculator: CharacterMovementActuator,
+	player_input: InputState) -> CharacterPhysicsState:
+	return movement_calculator.compute_next_physics_state(current_physics_state, player_input)
+
+static func __display_own_character(
+	character_transform: CharacterTransformState,
+	first_person_display: CharacterFirstPersonOutput):
+	first_person_display.display_character_transform(character_transform)
+
+static func __display_remote_characters(remote_character_resources: Array[RemoteCharacterResource]):
+	for remote_character_resource in remote_character_resources:
+		remote_character_resource.third_person_display().display_character_transform(
+			remote_character_resource.transform_state())
+
+static func __replay_physics_computation_using_inputs(
+	initial_player_state: CharacterPhysicsState,
+	inputs_to_replay: Array[InputState],
+	movement_calculator: CharacterMovementActuator) -> CharacterPhysicsState:
+	var simulation_state: CharacterPhysicsState = initial_player_state
+	for simulation_input in inputs_to_replay:
+		simulation_state = movement_calculator.compute_next_physics_state(simulation_state, simulation_input)
+	return simulation_state
+
+class ReconciliationData:
+	var physics_state_: CharacterPhysicsState
+	var client_tick_: int
+
+	func _init(physics_state: CharacterPhysicsState, client_tick: int):
+		physics_state_ = physics_state
+		client_tick_ = client_tick
+	
+	static func from_server_to_client_snapshot(snapshot: ServerToClientStateSnapshotMessage) -> ReconciliationData:
+		return ReconciliationData.new(snapshot.client_state_snapshot().own_character_state(), snapshot.client_tick())
+	
+	func physics_state() -> CharacterPhysicsState:
+		return physics_state_
+	
+	func client_tick() -> int:
+		return client_tick_
+
+class RemoteCharacterResource:
+	var transform_state_
+	var third_person_display_
+
+	func _init(transform_state, third_person_display):
+		transform_state_ = transform_state
+		third_person_display_ = third_person_display
+	
+	func transform_state() -> CharacterTransformState:
+		return transform_state_
+	
+	func third_person_display() -> CharacterThirdPersonDisplay:
+		return third_person_display_

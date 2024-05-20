@@ -13,20 +13,13 @@ func _ready():
 		get_tree().change_scene_to_file("res://scenes/server.tscn")
 
 
-func start_server():
+func start_server() -> bool:
 	var peer = ENetMultiplayerPeer.new()
 	var error = peer.create_server(Network.PORT)
 	if error: 
-		return error
+		return true
 	multiplayer.multiplayer_peer = peer
-
-
-func _start_client():
-	get_tree().change_scene_to_file("res://scenes/client.tscn")
-
-
-func _start_server():
-	get_tree().change_scene_to_file("res://scenes/server.tscn")
+	return false
 
 func _on_player_connected(id):
 	pass
@@ -34,10 +27,8 @@ func _on_player_connected(id):
 func _on_player_disconnected(id):
 	player_disconnected.emit(id)
 
-
 func _on_connected_ok():
 	var peer_id = multiplayer.get_unique_id()
-
 
 func _on_connected_fail():
 	multiplayer.multiplayer_peer = null

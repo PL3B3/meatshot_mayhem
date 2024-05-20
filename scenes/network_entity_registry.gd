@@ -63,3 +63,9 @@ func get_entity(entity_id: int) -> NetworkEntity:
 func get_network_owner_id_for_entity(entity_id: int) -> int:
 	return Utils.get_or_default(
 		entity_id_to_owner_id_map_, entity_id, Network.NO_NETWORK_OWNER_ID)
+
+func get_own_player_entity() -> CharacterNetworkEntity:
+	for entity: NetworkEntity in get_children():
+		if entity.get_network_mode() == CONSTANTS.NetworkEntityMode.OWN_CLIENT:
+			return entity as CharacterNetworkEntity
+	return null

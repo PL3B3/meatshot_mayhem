@@ -8,6 +8,9 @@ func add_client_stat(stat_name, interval=10, use_diff=false) -> Statistics:
 func add_server_stat(stat_name, interval=10, use_diff=false, display_label=null) -> Statistics:
 	return add_statistic(stat_name, NetworkLogMode.SERVER_ONLY, interval, use_diff)
 
+func add_universal_stat(stat_name, interval=10, use_diff=false, display_label=null) -> Statistics:
+	return add_statistic(stat_name, NetworkLogMode.CLIENT_AND_SERVER, interval, use_diff)
+
 func add_statistic(stat_name, network_mode, interval=10, use_diff=false, display_label=null) -> Statistics:
 	var statistic = Statistics.new(stat_name, use_diff, network_mode, interval)
 	statistics_[stat_name] = statistic

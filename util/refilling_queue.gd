@@ -1,8 +1,6 @@
 extends Object
 class_name RefillingQueue
 
-const NO_STAT_NAME = ""
-
 var is_return_last_valid_: bool = false
 var target_size_: int
 var max_size_: int
@@ -10,6 +8,7 @@ var max_size_: int
 var items_: Array[QueueItem] = []
 var last_valid_item_: QueueItem = null
 var queue_size_stat_: Statistics
+var queue_name_
 
 """
 Simple message buffer, used as safety against network variance
@@ -23,25 +22,31 @@ How it works:
 """
 
 func _init(
+		queue_name: String,
 		is_return_last_valid: bool = false, 
-		stat_name: String = "", 
-		target_size: int = 2, 
-		max_size: int = 4):
+		target_size: int = 3, 
+		max_size: int = 6):
+	queue_name_ = queue_name
+	queue_size_stat_ = LogsAndMetrics.add_universal_stat("%s-size" % queue_name, 10)
 	is_return_last_valid_ = is_return_last_valid
 	target_size_ = target_size
 	max_size_ = max_size
-	if stat_name != NO_STAT_NAME:
-		queue_size_stat_ = LogsAndMetrics.add_server_stat(stat_name, 1)
 
 func push(item):
+	queue_size_stat_.add_sample(items_.size())
 	items_.push_back(QueueItem.new(item, true))
 	last_valid_item_ = items_.back()
-	while items_.size() > max_size_:
-		items_.pop_front()
+	if items_.size() > max_size_:
+		print("Queue %s has more than %d items, discarding oldest items until size reaches %d" % [
+			queue_name_, max_size_, target_size_])
+		while items_.size() > target_size_:
+			items_.pop_front()
 
 func pop() -> QueueItem:
 	queue_size_stat_.add_sample(items_.size())
 	if items_.is_empty():
+		print("Attempting to pop from empty queue %s. Padding with %d dummy items" % [
+			queue_name_, target_size_])
 		for i in range(target_size_):
 			items_.push_back(QueueItem.DUMMY_ITEM)
 	var front_item: QueueItem = items_.pop_front()
