@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bebb6s7qf4gvs"]
+
+[ext_resource type="Script" path="res://scenes/datamodels/data_class_generator.gd" id="1_8peyf"]
+
+[node name="DataClassGenerator" type="Node"]
+script = ExtResource("1_8peyf")

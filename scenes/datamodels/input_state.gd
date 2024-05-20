@@ -4,6 +4,8 @@ class_name InputState
 
 enum INPUT_STATE_KEY { YAW, PITCH, IS_JUMPING, IS_SLOW_WALKING, DIRECTION }
 
+static var DEFAULT = InputState.new(0, 0, false, false, Vector2())
+
 var yaw_: float
 var pitch_: float
 var is_jumping_: bool
@@ -49,7 +51,6 @@ static func from_dict(serialized_data: Dictionary):
 		serialized_data[INPUT_STATE_KEY.IS_SLOW_WALKING],
 		serialized_data[INPUT_STATE_KEY.DIRECTION]
 	)
-	
 
 func _to_string():
 	return str(to_dict())

@@ -81,6 +81,6 @@ func print_with_network_role(message: String):
 
 func get_network_role_descriptor():
 	if multiplayer.is_server():
-		return "<SV::::::::::::>"
+		return "<SV::%010d>" % multiplayer.get_unique_id()
 	else:
-		return "<CL::%d>" % multiplayer.get_unique_id()
+		return "<CL::%10d>" % multiplayer.get_unique_id()

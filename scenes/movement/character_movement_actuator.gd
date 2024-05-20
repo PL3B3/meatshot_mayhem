@@ -26,7 +26,6 @@ const FLOOR_CHECK_TOLERANCE:float = 0.01
 const FLOOR_ANGLE:float = deg_to_rad(46)
 
 @onready var debug_sphere = preload("res://scenes/debug_sphere.tscn")
-@onready var camera = $Camera3D
 @onready var last_position = global_position 
 var yaw_: float = 0
 var pitch_: float = 0
@@ -39,8 +38,9 @@ func _ready():
 	collision_shape.radius = COLLISION_RADIUS
 	smaller_collision_shape.radius = COLLISION_RADIUS - SKIN_DEPTH
 
-func compute_next_physics_state(character_physics_state: CharacterPhysicsState, input_state: InputState):
+func compute_next_physics_state(character_physics_state: CharacterPhysicsState, input_state: InputState) -> CharacterPhysicsState:
 	var delta = CONSTANT_DELTA
+	position = character_physics_state.position()
 	var player_velocity = character_physics_state.velocity()
 	var h_velocity = Vector3(player_velocity.x, 0, player_velocity.z)
 	var facing_horizontal_direction_basis = Basis.IDENTITY.rotated(Vector3.UP, deg_to_rad(input_state.yaw()))

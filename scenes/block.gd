@@ -17,3 +17,4 @@ func _ready():
 	mesh.mesh.size = initial_scale
 	
 	global_transform.basis = global_transform.basis.orthonormalized()
+	

@@ -8,9 +8,11 @@ top_level = true
 script = ExtResource("1_qklto")
 
 [node name="Camera3D" type="Camera3D" parent="."]
+current = true
 fov = 90.0
 
 [node name="DebugLabels" type="Control" parent="."]
+visible = false
 layout_mode = 3
 anchors_preset = 0
 offset_right = 40.0

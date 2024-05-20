@@ -19,7 +19,6 @@ clearcoat = 0.09
 clearcoat_roughness = 0.62
 uv1_scale = Vector3(0.1, 0.1, 0.1)
 uv1_triplanar = true
-texture_filter = 0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_2rb4i"]
 material = SubResource("StandardMaterial3D_uan86")
@@ -113,3 +112,7 @@ transform = Transform3D(0.05, 0, 0, 0, 0.05, 0, 0, 0, 0.05, 24.845, -2.571, -28.
 
 [node name="CubicPig" parent="." instance=ExtResource("6_123b8")]
 transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 30, -1.5, -27)
+visible = false
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 27.8957, 0)

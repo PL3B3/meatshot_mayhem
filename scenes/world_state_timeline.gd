@@ -2,49 +2,6 @@ extends Object
 
 class_name WorldStateTimeline
 
-"""
-Indexed by tick, then by id, then data type
-{
-	15: {
-		1014: {
-			PhysicsState: PhysicsStateData{...}
-			Input: Input{...}
-		}
-		8472: {
-			PhysicsState: PhysicsStateData{...}
-		}
-	},
-	16: {
-		1014: {
-			PhysicsState: PhysicsStateData{...}
-			Input: Input{...}
-		}
-		8472: {
-			PhysicsState: PhysicsStateData{...}
-		}
-	}
-}
-"""
-#var world_state_per_tick_: Dictionary = {}
-#var latest_tick_: int = 0
-#
-#func set_state(tick: int, state_type, entity_id, state_value):
-	#latest_tick_ = max(latest_tick_, tick)
-	#var world_state_for_tick: Dictionary = compute_if_absent(world_state_per_tick_, tick, {})
-	#var states_for_type: Dictionary = compute_if_absent(world_state_for_tick, state_type, {})
-	#states_for_type[entity_id] = state_value
-#
-#func advance_tick_and_copy_latest_state():
-	#var latest_state: Dictionary = compute_if_absent(world_state_per_tick_, latest_tick_, {})
-	#world_state_per_tick_[latest_tick_ + 1] = latest_state.duplicate(true)
-	#latest_tick_ += 1
-	#return latest_tick_
-#
-#static func compute_if_absent(dictionary, key, default_value):
-	#if !dictionary.has(key):
-		#dictionary[key] = default_value
-	#return dictionary[key]
-
 var world_states_: Array = []
 
 func add_next_state(next_state: Dictionary):
@@ -69,6 +26,9 @@ func get_entity_state(tick: int, entity_id: int):
 
 func get_current_tick():
 	return world_states_.size() - 1
+
+func get_next_tick():
+	return get_current_tick() + 1
 
 func has_states():
 	return world_states_.size() > 0
