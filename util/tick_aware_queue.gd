@@ -2,10 +2,11 @@ extends Object
 class_name TickAwareQueue
 
 const VALID := true
+static var NO_DEFAULT_VALUE = null
 
 var target_size_: int
 var max_size_: int
-
+var default_return_value_if_empty_: Variant
 var items_: Array[QueueItem] = []
 
 var queue_size_stat_: Statistics
@@ -15,11 +16,13 @@ var is_buffering_: bool = true
 
 func _init(
 		queue_name: String,
+		default_return_value_if_empty: Variant = NO_DEFAULT_VALUE,
 		target_size: int = 3, 
 		max_size: int = 6):
 	assert(target_size > 0)
 	queue_name_ = queue_name
 	queue_size_stat_ = LogsAndMetrics.add_universal_stat("%s-size" % queue_name, 30)
+	default_return_value_if_empty_ = default_return_value_if_empty
 	target_size_ = target_size
 	max_size_ = max_size
 
@@ -33,7 +36,7 @@ func pop() -> QueueItem:
 	queue_size_stat_.add_sample(items_.size())
 	__enable_buffering_if_empty()
 	if __check_if_still_buffering():
-		return QueueItem.DUMMY_ITEM
+		return __get_default_if_configured_else_dummy()
 	else:
 		latest_popped_tick_ = items_[0].tick()
 		return items_.pop_front()
@@ -74,3 +77,9 @@ func __insert_item_in_order(item: QueueItem):
 			return
 	# item's tick is highest seen so far, so append to end of buffer
 	items_.push_back(item)
+
+func __get_default_if_configured_else_dummy():
+	if default_return_value_if_empty_ == NO_DEFAULT_VALUE:
+		return QueueItem.DUMMY_ITEM
+	else:
+		return QueueItem.new(default_return_value_if_empty_, VALID, Network.NO_TICK)

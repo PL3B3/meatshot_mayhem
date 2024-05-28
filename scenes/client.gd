@@ -129,7 +129,7 @@ func _physics_process(_delta):
 		latest_input)
 	
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
-		next_own_character_physics_state, current_state.remote_character_states())
+		next_own_character_physics_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
 	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
 	network_messenger_.send_message_to_server({
