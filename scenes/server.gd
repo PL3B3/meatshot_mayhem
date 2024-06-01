@@ -4,8 +4,8 @@ const EMPTY_PHYSICS_STATE = {}
 const SPAWN_POINT_RANDOM_VARIATION = 5
 const SPAWN_POINT = Vector3(0, 2.5, 0)
 const OVERWRITE_EXISTING = true
-static var DEFAULT_PHYSICS_STATE = CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
-static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x): 
+static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
+static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> TickAwareQueue: 
 	return TickAwareQueue.new("sv_input_buf[%10d]" % x, InputState.DEFAULT)
 
 @onready var messenger: NetworkMessenger = $NetworkMessenger
@@ -15,13 +15,13 @@ static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x):
 var client_resources_per_peer_id_ := {}
 var world_state_ := {}
 
-func _ready():
+func _ready() -> void:
 	resize_window()
 	multiplayer.peer_connected.connect(_on_client_connected)
 	messenger.received_client_message.connect(_handle_client_message)
 	map_spawner.spawn(null)
 
-func _handle_client_message(client_id: int, message: Dictionary):
+func _handle_client_message(client_id: int, message: Dictionary) -> void:
 	if client_id in client_resources_per_peer_id_:
 		var client_resources: InputBufferAndCharacterEntity = client_resources_per_peer_id_[client_id]
 		var input_buffer_for_client: TickAwareQueue = client_resources.input_buffer
@@ -30,15 +30,15 @@ func _handle_client_message(client_id: int, message: Dictionary):
 	else:
 		print("Cannot enqueue input message %s from client %d. No input buffer initialized." % [message, client_id])
 
-func _on_client_connected(id: int):
+func _on_client_connected(id: int) -> void:
 	__initialize_resources_for_new_client(id)
-	var prior_peer_count = multiplayer.get_peers().size() - 1
+	var prior_peer_count: int = multiplayer.get_peers().size() - 1
 	resize_window.rpc_id(id, prior_peer_count)
 	resize_window(prior_peer_count)
 
-func _physics_process(_delta):
+func _physics_process(_delta: float) -> void:
 	var character_resource_per_client_id: Dictionary = {}
-	for client_id in client_resources_per_peer_id_:
+	for client_id: int in client_resources_per_peer_id_:
 		var client_input_buffer_and_character: InputBufferAndCharacterEntity = client_resources_per_peer_id_[client_id]
 		var latest_client_input_with_tick: QueueItem = client_input_buffer_and_character.input_buffer.pop()
 		var latest_input: InputState = latest_client_input_with_tick.value()
@@ -55,7 +55,7 @@ func _physics_process(_delta):
 	
 	var next_world_state := {}
 	var data_to_export_per_client := {}
-	for client_id in character_resource_per_client_id:
+	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		var character_entity_id := character_resource.character_entity_id
 		var next_physics_state := character_resource.movement_calculator.compute_next_physics_state(
@@ -77,21 +77,22 @@ func _physics_process(_delta):
 	__export_state_snapshots_to_clients(data_to_export_per_client)
 
 @rpc("authority", "call_local", "reliable")
-func resize_window(index=0):
+func resize_window(index: int = 0)  -> void:
 	var screen_size: Vector2 = DisplayServer.screen_get_size()
 	get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
 	get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
 
-func __initialize_resources_for_new_client(client_id: int):
-	var client_character_entity: NetworkEntity = entity_spawner.spawn_entity({"entity_network_owner_id": client_id})
+func __initialize_resources_for_new_client(client_id: int) -> void:
+	var client_character_entity: CharacterNetworkEntity = (
+		entity_spawner.spawn_entity({"entity_network_owner_id": client_id}))
 	var input_buffer_for_client: TickAwareQueue = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
 	var client_resources: InputBufferAndCharacterEntity = InputBufferAndCharacterEntity.new(
 		input_buffer_for_client, client_character_entity)
 	client_resources_per_peer_id_[client_id] = client_resources
 
-func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary):
-	var state_snapshots_for_clients := {}
-	for client_id in data_to_export_per_client:
+func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) -> Dictionary:
+	var state_snapshots_for_clients: Dictionary = {}
+	for client_id: int in data_to_export_per_client:
 		var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
 		var remote_character_state_per_entity: Dictionary = __extract_states_for_remote_characters(
 			data_to_export_per_client, client_id)
@@ -105,10 +106,10 @@ static func __extract_states_for_remote_characters(
 	data_to_export_per_client: Dictionary, 
 	own_client_id: int) -> Dictionary:
 	var states_for_remote_characters := {}
-	for client_id in data_to_export_per_client:
+	for client_id: int in data_to_export_per_client:
 		if client_id != own_client_id:
 			var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
-			var remote_character_entity_id = client_snapshot_data.character_entity_id
+			var remote_character_entity_id: int = client_snapshot_data.character_entity_id
 			states_for_remote_characters[remote_character_entity_id] = client_snapshot_data.transform_state
 	return states_for_remote_characters
 
@@ -125,7 +126,7 @@ class InputBufferAndCharacterEntity:
 	var input_buffer: TickAwareQueue
 	var character_entity: CharacterNetworkEntity
 
-	func _init(input_buffer: TickAwareQueue, character_entity: CharacterNetworkEntity):
+	func _init(input_buffer: TickAwareQueue, character_entity: CharacterNetworkEntity) -> void:
 		self.input_buffer = input_buffer
 		self.character_entity = character_entity
 
@@ -143,7 +144,7 @@ class ServerCharacterResource:
 		client_tick: int,
 		character_entity_id: int,
 		current_physics_state: CharacterPhysicsState, 
-		character_network_entity: CharacterNetworkEntity):
+		character_network_entity: CharacterNetworkEntity) -> void:
 		self.input = input
 		self.client_tick = client_tick
 		self.character_entity_id = character_entity_id
@@ -162,7 +163,7 @@ class PerClientExportedData:
 		client_tick: int,
 		physics_state: CharacterPhysicsState,
 		transform_state: CharacterTransformState,
-		character_entity_id: int): 
+		character_entity_id: int) -> void: 
 		self.client_tick = client_tick
 		self.physics_state = physics_state
 		self.transform_state = transform_state
