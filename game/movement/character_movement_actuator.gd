@@ -25,7 +25,7 @@ const DOWN = -UP
 const FLOOR_CHECK_TOLERANCE:float = 0.01
 const FLOOR_ANGLE:float = deg_to_rad(46)
 
-@onready var debug_sphere = preload("res://scenes/debug_sphere.tscn")
+@onready var debug_sphere = preload("res://game/debug_sphere.tscn")
 @onready var last_position = global_position 
 var yaw_: float = 0
 var pitch_: float = 0

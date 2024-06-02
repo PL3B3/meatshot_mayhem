@@ -3,9 +3,9 @@ extends Control
 func _ready():
 	if start_server():
 		# hacky: server already created, so create client instead
-		get_tree().change_scene_to_file("res://scenes/client.tscn")
+		get_tree().change_scene_to_file("res://game/client.tscn")
 	else:
-		get_tree().change_scene_to_file("res://scenes/server.tscn")
+		get_tree().change_scene_to_file("res://game/server.tscn")
 
 func start_server() -> bool:
 	var peer = ENetMultiplayerPeer.new()

@@ -1,9 +1,9 @@
 extends Node
 class_name CharacterComponents
 
-const MOVEMENT_BODY_SCENE := preload("res://scenes/movement/character_movement_actuator.tscn")
-const FIRST_PERSON_DISPLAY_SCENE := preload("res://scenes/character/character_first_person_display_output.tscn")
-const THIRD_PERSON_DISPLAY_SCENE := preload("res://scenes/character/character_third_person_display.tscn")
+const MOVEMENT_BODY_SCENE := preload("res://game/movement/character_movement_actuator.tscn")
+const FIRST_PERSON_DISPLAY_SCENE := preload("res://game/character/character_first_person_display_output.tscn")
+const THIRD_PERSON_DISPLAY_SCENE := preload("res://game/character/character_third_person_display.tscn")
 
 var movement_body_: CharacterMovementActuator
 var first_person_display_: CharacterFirstPersonOutput

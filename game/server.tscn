@@ -1,9 +1,9 @@
 [gd_scene load_steps=5 format=3 uid="uid://dbbfwqe04glnk"]
 
-[ext_resource type="Script" path="res://scenes/server.gd" id="1_nwq0y"]
-[ext_resource type="PackedScene" uid="uid://bmyetss0yrpp5" path="res://scenes/spawners/map_spawner.tscn" id="2_cv5qq"]
-[ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://scenes/network_messenger.tscn" id="4_570yk"]
-[ext_resource type="PackedScene" uid="uid://ftsn6dep3odr" path="res://scenes/entity_spawner.tscn" id="4_sxneu"]
+[ext_resource type="Script" path="res://game/server.gd" id="1_nwq0y"]
+[ext_resource type="PackedScene" uid="uid://bmyetss0yrpp5" path="res://game/spawners/map_spawner.tscn" id="2_cv5qq"]
+[ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://game/network_messenger.tscn" id="4_570yk"]
+[ext_resource type="PackedScene" uid="uid://ftsn6dep3odr" path="res://game/entity_spawner.tscn" id="4_sxneu"]
 
 [node name="NetworkRoot" type="Node"]
 script = ExtResource("1_nwq0y")

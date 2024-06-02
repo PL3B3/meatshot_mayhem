@@ -1,11 +1,11 @@
 [gd_scene load_steps=3 format=3 uid="uid://c8jh8ru1xis61"]
 
-[ext_resource type="Script" path="res://scenes/character/character_first_person_display_output.gd" id="1_qklto"]
-[ext_resource type="Texture2D" uid="uid://b7g6q3dcwtppr" path="res://assets/crosshair.png" id="2_gfaq5"]
+[ext_resource type="Script" path="res://game/character/character_first_person_display_output.gd" id="1_3sshd"]
+[ext_resource type="Texture2D" uid="uid://b7g6q3dcwtppr" path="res://assets/crosshair.png" id="2_edoxe"]
 
 [node name="CharacterFirstPersonDisplayOutput" type="Node3D"]
 top_level = true
-script = ExtResource("1_qklto")
+script = ExtResource("1_3sshd")
 
 [node name="Camera3D" type="Camera3D" parent="."]
 current = true
@@ -40,4 +40,4 @@ grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(0.05, 0.05)
 pivot_offset = Vector2(512, 512)
-texture = ExtResource("2_gfaq5")
+texture = ExtResource("2_edoxe")

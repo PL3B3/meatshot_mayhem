@@ -3,8 +3,8 @@
 [ext_resource type="Environment" uid="uid://cwjnu3fulwik2" path="res://assets/environment_bright.tres" id="1_mdafn"]
 [ext_resource type="Texture2D" uid="uid://dx2ex6b2855uv" path="res://assets/overhang_fence_planks.png" id="2_11hry"]
 [ext_resource type="Texture2D" uid="uid://dvsdqx4qq7yi5" path="res://assets/texture_02.png" id="3_oqarb"]
-[ext_resource type="PackedScene" uid="uid://f8b0rlfdw0bm" path="res://scenes/block.tscn" id="4_m0jij"]
-[ext_resource type="PackedScene" uid="uid://dltio1maqii4i" path="res://scenes/debug_sphere.tscn" id="5_npfxi"]
+[ext_resource type="PackedScene" uid="uid://f8b0rlfdw0bm" path="res://game/block.tscn" id="4_m0jij"]
+[ext_resource type="PackedScene" uid="uid://dltio1maqii4i" path="res://game/debug_sphere.tscn" id="5_npfxi"]
 [ext_resource type="PackedScene" uid="uid://dkyru6hvschwy" path="res://assets/CubicPig.glb" id="6_123b8"]
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_tyg1n"]

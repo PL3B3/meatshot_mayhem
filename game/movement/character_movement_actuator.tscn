@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://14kdx16utr13"]
 
-[ext_resource type="Script" path="res://scenes/movement/character_movement_actuator.gd" id="1_6w6vr"]
+[ext_resource type="Script" path="res://game/movement/character_movement_actuator.gd" id="1_6w6vr"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_12wfh"]
 radius = 2.5
