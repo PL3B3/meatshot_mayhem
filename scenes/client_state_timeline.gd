@@ -16,27 +16,6 @@ func get_state(tick: int) -> ClientStateSnapshot:
 func get_current_state() -> ClientStateSnapshot:
 	return get_state(get_current_tick())
 
-# func get_current_entity_state(entity_id: int):
-# 	return get_entity_state(get_current_tick(), entity_id)
-
-# func get_entity_state(tick: int, entity_id: int):
-# 	var state_for_tick = get_state(tick)
-# 	return Utils.get_or_default(state_for_tick, entity_id, {})
-
-# func get_remote_character_states(tick: int) -> Dictionary:
-# 	var state_for_tick := get_state(tick)
-# 	if state_for_tick != null:
-# 		return state_for_tick.remote_character_states()
-# 	else:
-# 		return {}
-
-# func get_own_character_state(tick: int) -> CharacterPhysicsState:
-# 	var state_for_tick := get_state(tick)
-# 	if state_for_tick != null:
-# 		return state_for_tick.own_character_state()
-# 	else:
-# 		return null
-
 func get_current_tick():
 	return world_states_.size() - 1
 
