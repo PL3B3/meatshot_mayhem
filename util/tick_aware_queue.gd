@@ -2,6 +2,7 @@ extends Object
 class_name TickAwareQueue
 
 const VALID := true
+const IS_LOGGING_ENABLED := false
 static var NO_DEFAULT_VALUE = null
 
 var target_size_: int
@@ -45,7 +46,7 @@ func pop() -> QueueItem:
 
 func __enable_buffering_if_empty() -> bool:
 	if items_.is_empty():
-		print("Tried to pop from empty queue %s. Returning dummy items until %d valid items are buffered" % [
+		__log("Tried to pop from empty queue %s. Returning dummy items until %d valid items are buffered", [
 			queue_name_, target_size_])
 		is_buffering_ = true
 		return true
@@ -54,16 +55,16 @@ func __enable_buffering_if_empty() -> bool:
 
 func __check_if_still_buffering():
 	if is_buffering_ and items_.size() < target_size_:
-		print("Currently at %d items, buffering until %d items" % [
-			items_.size(), target_size_])
+		__log("Currently at %d items, buffering until %d items", [items_.size(), target_size_])
 	else:
 		is_buffering_ = false
 	return is_buffering_
 
 func __shrink_queue_if_over_max_size():
 	if items_.size() >= max_size_:
-		print("Queue %s has more than %d items, discarding oldest items until size reaches %d" % [
-			queue_name_, max_size_, target_size_])
+		__log(
+			"Queue %s has more than %d items, discarding oldest items until size reaches %d", 
+			[queue_name_, max_size_, target_size_])
 		while items_.size() > target_size_:
 			items_.pop_front()
 
@@ -85,3 +86,7 @@ func __get_default_if_configured_else_dummy():
 		return QueueItem.DUMMY_ITEM
 	else:
 		return QueueItem.new(default_return_value_if_empty_, VALID, Network.NO_TICK)
+
+func __log(format_string: String, args: Array[Variant] = []) -> void:
+	if IS_LOGGING_ENABLED:
+		print(format_string % args)
