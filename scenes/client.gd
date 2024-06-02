@@ -12,6 +12,7 @@ const RECONCILIATION_POSITION_CORRECTION_LINEAR_FRACTION = 0.15
 const RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION = 0.5
 const RECONCILIATION_MAX_TICKS_REPLAYED = 16
 const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
+const ENABLE_LOGGING := false
 
 @onready var input_handler_: ClientInputHandler = $ClientInputHandler
 @onready var network_messenger_: NetworkMessenger = $NetworkMessenger
@@ -157,11 +158,13 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 			character_movement_calculator)
 		var corrected_state = __correct_predicted_physics_state_towards_simulated_authoritative_state(
 			predicted_player_physics_state, simulated_authoritative_physics_state)
-		#print("sim vel: %s. pred vel: %s" % [simulated_state.velocity(), predicted_state.velocity()])
-		#print("reconcile with state %s for tick %d. inputs: %s" % [
-			#own_player_server_state.state(), 
-			#own_player_server_state.tick(),
-			#input_handler_.get_inputs_since_tick(own_player_server_state.tick())])
+		if ENABLE_LOGGING:
+			print("Reconciling with state %s for tick %d. inputs: %s" % [
+				authoritative_physics_state_and_tick.physics_state(), 
+				reconciliation_replay_start_tick,
+				input_handler_.get_inputs_since_tick(reconciliation_replay_start_tick)])
+			print("Predicted state: %s.\nSimulated state: %s. Corrected state: %s" % 
+				[predicted_player_physics_state, simulated_authoritative_physics_state, corrected_state])
 		return corrected_state
 	else:
 		return predicted_player_physics_state
@@ -171,7 +174,8 @@ func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 	simulated_state: CharacterPhysicsState) -> CharacterPhysicsState:
 	var position_error: Vector3 = simulated_state.position() - predicted_state.position()
 	var velocity_error: Vector3 = simulated_state.velocity() - predicted_state.velocity()
-	# print("position err: %+00.4f. velocity err: %+00.4f" % [position_error.length(), velocity_error.length()])
+	if ENABLE_LOGGING:
+		print("position err: %+00.4f. velocity err: %+00.4f" % [position_error.length(), velocity_error.length()])
 	if (position_error.length() > RECONCILIATION_SNAP_IF_ABOVE 
 		or position_error.length() < RECONCILIATION_SNAP_IF_BELOW):
 		return simulated_state
