@@ -9,7 +9,8 @@ var max_size_: int
 var default_return_value_if_empty_: Variant
 var items_: Array[QueueItem] = []
 
-var queue_size_stat_: Statistics
+var queue_size_at_pop_stat_: Statistics
+var queue_size_at_push_stat_: Statistics
 var queue_name_
 var latest_popped_tick_: int = -1
 var is_buffering_: bool = true
@@ -21,19 +22,20 @@ func _init(
 		max_size: int = 6):
 	assert(target_size > 0)
 	queue_name_ = queue_name
-	queue_size_stat_ = LogsAndMetrics.add_universal_stat("%s-size" % queue_name, 30)
+	queue_size_at_pop_stat_ = LogsAndMetrics.add_universal_stat("%s-size-at-pop" % queue_name, 60)
+	queue_size_at_push_stat_ = LogsAndMetrics.add_universal_stat("%s-size-at-push" % queue_name, 60)
 	default_return_value_if_empty_ = default_return_value_if_empty
 	target_size_ = target_size
 	max_size_ = max_size
 
 func push(value, tick):
-	queue_size_stat_.add_sample(items_.size())
+	queue_size_at_push_stat_.add_sample(items_.size())
 	var item = QueueItem.new(value, VALID, tick)
 	__shrink_queue_if_over_max_size()
 	__insert_item_in_order(item)
 
 func pop() -> QueueItem:
-	queue_size_stat_.add_sample(items_.size())
+	queue_size_at_pop_stat_.add_sample(items_.size())
 	__enable_buffering_if_empty()
 	if __check_if_still_buffering():
 		return __get_default_if_configured_else_dummy()
