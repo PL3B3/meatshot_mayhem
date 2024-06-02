@@ -1,7 +1,7 @@
 [gd_scene load_steps=7 format=3 uid="uid://h7cb3wv00atf"]
 
-[ext_resource type="Script" path="res://scenes/character/character_third_person_display.gd" id="1_5lgp3"]
-[ext_resource type="Texture2D" uid="uid://dhjqb2m4xdwqg" path="res://assets/EyeTexture.jpg" id="1_ou3ld"]
+[ext_resource type="Script" path="res://game/character/character_third_person_display.gd" id="1_nunan"]
+[ext_resource type="Texture2D" uid="uid://dhjqb2m4xdwqg" path="res://assets/EyeTexture.jpg" id="2_2t6qc"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uumba"]
 albedo_color = Color(1, 0.431373, 0.498039, 1)
@@ -18,7 +18,7 @@ radius = 2.5
 height = 5.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tbhex"]
-albedo_texture = ExtResource("1_ou3ld")
+albedo_texture = ExtResource("2_2t6qc")
 metallic_specular = 1.0
 roughness = 0.0
 uv1_offset = Vector3(0.25, -0.245, 0)
@@ -30,7 +30,7 @@ height = 4.0
 
 [node name="CharacterThirdPersonDisplay" type="Node3D"]
 top_level = true
-script = ExtResource("1_5lgp3")
+script = ExtResource("1_nunan")
 
 [node name="Body" type="MeshInstance3D" parent="."]
 mesh = SubResource("SphereMesh_rxjo0")
