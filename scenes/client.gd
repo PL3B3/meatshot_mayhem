@@ -15,8 +15,8 @@ const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
 
 @onready var input_handler_: ClientInputHandler = $ClientInputHandler
 @onready var network_messenger_: NetworkMessenger = $NetworkMessenger
-@onready var entity_registry_: NetworkEntityRegistry = $NetworkEntityRegistry
 @onready var debug_label_: Label = $DebugLabel
+@onready var entity_spawner_: EntitySpawner = $EntitySpawner
 
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_state_buffer_: RefillingQueue
@@ -76,10 +76,7 @@ func _physics_process(_delta):
 		print("No starting state. Will not compute game tick.")
 		return
 	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
-	var own_character_entity: CharacterNetworkEntity = entity_registry_.get_own_player_entity()
-	if own_character_entity == null:
-		print("Character entity object not initialized. Will not compute game tick.")
-		return
+	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
 	var latest_input: InputState = input_handler_.get_and_record_latest_input(client_state_timeline_.get_next_tick())
 	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state()
 	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
@@ -105,32 +102,30 @@ func _physics_process(_delta):
 	for remote_character_entity_id in latest_remote_character_state_per_entity_id:
 		var remote_character_state: CharacterTransformState = (
 			latest_remote_character_state_per_entity_id[remote_character_entity_id])
-		var remote_character_network_entity: CharacterNetworkEntity = (
-			entity_registry_.get_entity(remote_character_entity_id))
-		if remote_character_network_entity == null:
-			print("No character network entity for remote character with id %d. Skipping game tick.")
-			return
+		var remote_character_components: CharacterComponents = (
+			entity_spawner_.get_or_spawn_character(remote_character_entity_id, CONSTANTS.NetworkEntityMode.OTHER_CLIENT))
 		var remote_character_resource: RemoteCharacterResource = RemoteCharacterResource.new(
-			remote_character_state, remote_character_network_entity.get_third_person_display())
+			remote_character_state, remote_character_components.third_person_display())
 		remote_character_resources.push_back(remote_character_resource)
 
 	var optionally_reconciled_own_character_physics_state: CharacterPhysicsState = (
 		__reconcile_own_character_physics_state_with_authoritative_state(
 			reconciliation_data, 
 			own_character_physics_state, 
-			own_character_entity.get_movement_calculator(), 
+			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
 	
-	__display_own_character(own_character_transform_state, own_character_entity.get_first_person_display())
+	__display_own_character(own_character_transform_state, own_character_components.first_person_display())
 	__display_remote_characters(remote_character_resources)
 	var next_own_character_physics_state: CharacterPhysicsState = __compute_next_physics_state(
 		optionally_reconciled_own_character_physics_state, 
-		own_character_entity.get_movement_calculator(), 
+		own_character_components.movement_body(), 
 		latest_input)
 	
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
 		next_own_character_physics_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
+	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
 	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
 	network_messenger_.send_message_to_server({
 		"input": latest_input.to_dict(), 

@@ -10,7 +10,8 @@ static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> TickAwareQueu
 
 @onready var messenger: NetworkMessenger = $NetworkMessenger
 @onready var map_spawner: MultiplayerSpawner = $MapSpawner
-@onready var entity_spawner: NetworkEntityRegistry = $NetworkEntityRegistry
+@onready var entity_spawner_: EntitySpawner= $EntitySpawner
+@onready var entity_creator_ := EntityCreator.new(entity_spawner_)
 
 var client_resources_per_peer_id_ := {}
 var world_state_ := {}
@@ -43,28 +44,29 @@ func _physics_process(_delta: float) -> void:
 		var latest_client_input_with_tick: QueueItem = client_input_buffer_and_character.input_buffer.pop()
 		var latest_input: InputState = latest_client_input_with_tick.value()
 		var client_tick_for_input: int = latest_client_input_with_tick.tick()
-		var character_entity_id: int = client_input_buffer_and_character.character_entity.get_entity_id()
+		var character_entity_id: int = client_input_buffer_and_character.character_entity.entity_id
 		var character_physics_state: CharacterPhysicsState = Utils.get_or_default(
-			world_state_, character_entity_id, DEFAULT_PHYSICS_STATE)
+			world_state_, character_entity_id, client_input_buffer_and_character.character_entity.state_data)
 		character_resource_per_client_id[client_id] = ServerCharacterResource.new(
 			latest_input,
 			client_tick_for_input,
 			character_entity_id,
 			character_physics_state,
-			client_input_buffer_and_character.character_entity)
+			client_input_buffer_and_character.character_entity.components)
 	
 	var next_world_state := {}
 	var data_to_export_per_client := {}
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		var character_entity_id := character_resource.character_entity_id
-		var next_physics_state := character_resource.movement_calculator.compute_next_physics_state(
+		var character_components := character_resource.character_components
+		var next_physics_state := character_components.movement_body().compute_next_physics_state(
 				character_resource.current_physics_state, character_resource.input)
 		next_physics_state = __apply_debug_motion(next_physics_state, character_resource.input)
 		var character_transform_state := CharacterTransformState.new(
 			next_physics_state.position(), character_resource.input.pitch(), character_resource.input.yaw())
-		character_resource.first_person_display.display_character_transform(character_transform_state)
-		character_resource.third_person_display.display_character_transform(character_transform_state)
+		character_components.first_person_display().display_character_transform(character_transform_state)
+		character_components.third_person_display().display_character_transform(character_transform_state)
 
 		next_world_state[character_entity_id] = next_physics_state
 		data_to_export_per_client[client_id] = PerClientExportedData.new(
@@ -74,6 +76,7 @@ func _physics_process(_delta: float) -> void:
 			character_entity_id)
 	
 	world_state_ = next_world_state
+	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
 
 @rpc("authority", "call_local", "reliable")
@@ -83,8 +86,7 @@ func resize_window(index: int = 0)  -> void:
 	get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
 
 func __initialize_resources_for_new_client(client_id: int) -> void:
-	var client_character_entity: CharacterNetworkEntity = (
-		entity_spawner.spawn_entity({"entity_network_owner_id": client_id}))
+	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
 	var input_buffer_for_client: TickAwareQueue = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
 	var client_resources: InputBufferAndCharacterEntity = InputBufferAndCharacterEntity.new(
 		input_buffer_for_client, client_character_entity)
@@ -124,9 +126,9 @@ static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: In
 
 class InputBufferAndCharacterEntity:
 	var input_buffer: TickAwareQueue
-	var character_entity: CharacterNetworkEntity
+	var character_entity: CharacterEntity
 
-	func _init(input_buffer: TickAwareQueue, character_entity: CharacterNetworkEntity) -> void:
+	func _init(input_buffer: TickAwareQueue, character_entity: CharacterEntity) -> void:
 		self.input_buffer = input_buffer
 		self.character_entity = character_entity
 
@@ -135,23 +137,19 @@ class ServerCharacterResource:
 	var client_tick: int
 	var character_entity_id: int
 	var current_physics_state: CharacterPhysicsState
-	var movement_calculator: CharacterMovementActuator
-	var first_person_display: CharacterFirstPersonOutput
-	var third_person_display: CharacterThirdPersonDisplay
+	var character_components: CharacterComponents
 
 	func _init(
 		input: InputState, 
 		client_tick: int,
 		character_entity_id: int,
-		current_physics_state: CharacterPhysicsState, 
-		character_network_entity: CharacterNetworkEntity) -> void:
+		current_physics_state: CharacterPhysicsState,
+		character_components: CharacterComponents) -> void:
 		self.input = input
 		self.client_tick = client_tick
 		self.character_entity_id = character_entity_id
 		self.current_physics_state = current_physics_state
-		self.movement_calculator = character_network_entity.get_movement_calculator()
-		self.first_person_display = character_network_entity.get_first_person_display()
-		self.third_person_display = character_network_entity.get_third_person_display()
+		self.character_components = character_components
 
 class PerClientExportedData:
 	var client_tick: int
@@ -168,3 +166,35 @@ class PerClientExportedData:
 		self.physics_state = physics_state
 		self.transform_state = transform_state
 		self.character_entity_id = character_entity_id
+
+class EntityCreator:
+	static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
+
+	var spawner_: EntitySpawner
+	var next_entity_id_: int = 0
+
+	func _init(spawner: EntitySpawner) -> void:
+		spawner_ = spawner
+
+	func create_character_entity() -> CharacterEntity:
+		var character_entity_id := next_entity_id_
+		var character_components := spawner_.get_or_spawn_character(
+			character_entity_id, CONSTANTS.NetworkEntityMode.SERVER)
+		var character_data: CharacterPhysicsState = DEFAULT_PHYSICS_STATE
+		next_entity_id_ += 1
+		return CharacterEntity.new(character_data, character_components, character_entity_id)
+
+class Entity:
+	var entity_id: int
+
+	func _init(entity_id: int) -> void:
+		self.entity_id = entity_id
+
+class CharacterEntity extends Entity:
+	var state_data: CharacterPhysicsState
+	var components: CharacterComponents
+
+	func _init(state_data: CharacterPhysicsState, components: CharacterComponents, entity_id: int) -> void:
+		super(entity_id)
+		self.state_data = state_data
+		self.components = components

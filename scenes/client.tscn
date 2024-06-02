@@ -1,29 +1,21 @@
-[gd_scene load_steps=7 format=3 uid="uid://clb01f0ifogre"]
+[gd_scene load_steps=6 format=3 uid="uid://clb01f0ifogre"]
 
 [ext_resource type="Script" path="res://scenes/client.gd" id="1_x1e1o"]
 [ext_resource type="PackedScene" uid="uid://bmyetss0yrpp5" path="res://scenes/spawners/map_spawner.tscn" id="2_pgb0g"]
-[ext_resource type="PackedScene" uid="uid://btlnnfbdmap5w" path="res://scenes/spawners/character_spawner.tscn" id="3_r7d4j"]
 [ext_resource type="PackedScene" uid="uid://b43a0dnmkibyw" path="res://scenes/client_input_handler.tscn" id="4_53bko"]
 [ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://scenes/network_messenger.tscn" id="5_ilfw4"]
-[ext_resource type="PackedScene" uid="uid://rsj36bkhf2x5" path="res://scenes/network_entity_registry.tscn" id="6_p72tn"]
+[ext_resource type="PackedScene" uid="uid://ftsn6dep3odr" path="res://scenes/entity_spawner.tscn" id="5_w3vlx"]
 
 [node name="NetworkRoot" type="Node"]
 script = ExtResource("1_x1e1o")
-
-[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
-spawn_path = NodePath("../Spawns")
 
 [node name="Spawns" type="Node" parent="."]
 
 [node name="MapSpawner" parent="." instance=ExtResource("2_pgb0g")]
 
-[node name="CharacterSpawner" parent="." instance=ExtResource("3_r7d4j")]
-
 [node name="ClientInputHandler" parent="." instance=ExtResource("4_53bko")]
 
 [node name="NetworkMessenger" parent="." instance=ExtResource("5_ilfw4")]
-
-[node name="NetworkEntityRegistry" parent="." instance=ExtResource("6_p72tn")]
 
 [node name="DebugLabel" type="Label" parent="."]
 anchors_preset = 2
@@ -39,3 +31,5 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 10
 theme_override_font_sizes/font_size = 50
 text = "CLIENT"
+
+[node name="EntitySpawner" parent="." instance=ExtResource("5_w3vlx")]
