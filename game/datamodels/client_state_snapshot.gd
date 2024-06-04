@@ -6,14 +6,14 @@ enum CLIENT_STATE_SNAPSHOT {
 	REMOTE_CHARACTER_STATES
 }
 
-var own_character_state_: CharacterPhysicsState
+var own_character_state_: ClientOwnCharacterState
 var remote_character_states_: Dictionary
 
-func _init(own_character_state: CharacterPhysicsState, remote_character_states: Dictionary):
+func _init(own_character_state: ClientOwnCharacterState, remote_character_states: Dictionary):
 	own_character_state_ = own_character_state
 	remote_character_states_ = remote_character_states
 
-func own_character_state() -> CharacterPhysicsState:
+func own_character_state() -> ClientOwnCharacterState:
 	return own_character_state_
 
 func remote_character_states() -> Dictionary:
@@ -34,7 +34,7 @@ func __serialize_remote_character_states() -> Dictionary:
 
 static func from_dict(dict: Dictionary) -> ClientStateSnapshot:
 	return ClientStateSnapshot.new(
-		CharacterPhysicsState.from_dict(dict[CLIENT_STATE_SNAPSHOT.OWN_CHARACTER_STATE]),
+		ClientOwnCharacterState.from_dict(dict[CLIENT_STATE_SNAPSHOT.OWN_CHARACTER_STATE]),
 		__deserialize_remote_character_states(dict[CLIENT_STATE_SNAPSHOT.REMOTE_CHARACTER_STATES])
 	)
 
