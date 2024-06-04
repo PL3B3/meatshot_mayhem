@@ -7,6 +7,7 @@ const OVERWRITE_EXISTING = true
 static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
 static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> TickAwareQueue: 
 	return TickAwareQueue.new("sv_input_buf[%10d]" % x, InputState.DEFAULT)
+static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 
 @onready var messenger: NetworkMessenger = $NetworkMessenger
 @onready var map_spawner: MultiplayerSpawner = $MapSpawner
@@ -99,9 +100,11 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 		var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
 		var remote_character_state_per_entity: Dictionary = __extract_states_for_remote_characters(
 			data_to_export_per_client, client_id)
+		var client_own_character_state := ClientOwnCharacterState.new(
+			client_snapshot_data.physics_state, EMPTY_ABILITY_TRIGGER_STATE)
 		var state_snapshot_for_client := ServerToClientStateSnapshotMessage.new(
 			client_snapshot_data.client_tick, 
-			ClientStateSnapshot.new(client_snapshot_data.physics_state, remote_character_state_per_entity))
+			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
 		messenger.send_message_to_client(client_id, state_snapshot_for_client.to_dict())
 	return state_snapshots_for_clients
 

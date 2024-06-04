@@ -79,7 +79,7 @@ func _physics_process(_delta):
 	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
 	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
 	var latest_input: InputState = input_handler_.get_and_record_latest_input(client_state_timeline_.get_next_tick())
-	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state()
+	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state().physics_state()
 	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
 		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
 	
@@ -123,8 +123,10 @@ func _physics_process(_delta):
 		own_character_components.movement_body(), 
 		latest_input)
 	
+	var next_own_character_state := ClientOwnCharacterState.new(
+		next_own_character_physics_state, current_state.own_character_state().ability_trigger_state())
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
-		next_own_character_physics_state, latest_remote_character_state_per_entity_id)
+		next_own_character_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
 	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
 	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
@@ -223,7 +225,9 @@ class ReconciliationData:
 		client_tick_ = client_tick
 	
 	static func from_server_to_client_snapshot(snapshot: ServerToClientStateSnapshotMessage) -> ReconciliationData:
-		return ReconciliationData.new(snapshot.client_state_snapshot().own_character_state(), snapshot.client_tick())
+		return ReconciliationData.new(
+			snapshot.client_state_snapshot().own_character_state().physics_state(), 
+			snapshot.client_tick())
 	
 	func physics_state() -> CharacterPhysicsState:
 		return physics_state_
