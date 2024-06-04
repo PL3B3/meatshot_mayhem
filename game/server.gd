@@ -64,7 +64,6 @@ func _physics_process(_delta: float) -> void:
 		var character_components := character_resource.character_components
 		var next_physics_state := character_components.movement_body().compute_next_physics_state(
 				character_resource.current_physics_state, character_resource.input)
-		next_physics_state = __apply_debug_motion(next_physics_state, character_resource.input)
 		var character_transform_state := CharacterTransformState.new(
 			next_physics_state.position(), character_resource.input.pitch(), character_resource.input.yaw())
 		character_components.first_person_display().display_character_transform(character_transform_state)
