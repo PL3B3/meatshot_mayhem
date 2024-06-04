@@ -8,20 +8,23 @@ const THIRD_PERSON_DISPLAY_SCENE := preload("res://game/character/character_thir
 var movement_body_: CharacterMovementActuator
 var first_person_display_: CharacterFirstPersonOutput
 var third_person_display_: CharacterThirdPersonDisplay
+var ability_trigger_state_machine_: CharacterAbilityTriggerStateMachine
+var ability_action_: CharacterAbilityPrintAction
 
 func _init(
 	movement_body: CharacterMovementActuator, 
 	first_person_display: CharacterFirstPersonOutput, 
-	third_person_display: CharacterThirdPersonDisplay) -> void:
-	if movement_body != null:
-		movement_body_ = movement_body
-		add_child(movement_body)
-	if first_person_display != null:
-		first_person_display_ = first_person_display
-		add_child(first_person_display)
-	if third_person_display != null:
-		third_person_display_ = third_person_display
-		add_child(third_person_display)
+	third_person_display: CharacterThirdPersonDisplay,
+	ability_trigger_state_machine: CharacterAbilityTriggerStateMachine,
+	ability_action: CharacterAbilityPrintAction) -> void:
+	movement_body_ = movement_body
+	first_person_display_ = first_person_display
+	third_person_display_ = third_person_display
+	ability_trigger_state_machine_ = ability_trigger_state_machine
+	ability_action_ = ability_action
+	__add_child_if_not_null(movement_body)
+	__add_child_if_not_null(first_person_display)
+	__add_child_if_not_null(third_person_display)
 
 static func create_for_network_mode(network_mode: int) -> CharacterComponents:
 	match network_mode:
@@ -29,17 +32,23 @@ static func create_for_network_mode(network_mode: int) -> CharacterComponents:
 			return CharacterComponents.new(
 				MOVEMENT_BODY_SCENE.instantiate(), 
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
-				THIRD_PERSON_DISPLAY_SCENE.instantiate())
+				THIRD_PERSON_DISPLAY_SCENE.instantiate(),
+				null,
+				CharacterAbilityPrintAction.new())
 		CONSTANTS.NetworkEntityMode.OWN_CLIENT: 
 			return CharacterComponents.new(
 				MOVEMENT_BODY_SCENE.instantiate(), 
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
-				null)
+				null,
+				CharacterAbilityTriggerStateMachine.new(),
+				CharacterAbilityPrintAction.new())
 		CONSTANTS.NetworkEntityMode.OTHER_CLIENT:
 			return CharacterComponents.new(
 				null, 
 				null,
-				THIRD_PERSON_DISPLAY_SCENE.instantiate())
+				THIRD_PERSON_DISPLAY_SCENE.instantiate(),
+				null,
+				null)
 		_:
 			push_error("Network mode %d is not a value of NetworkEntityMode. Returning null" % network_mode)
 			return null
@@ -52,3 +61,13 @@ func first_person_display() -> CharacterFirstPersonOutput:
 
 func third_person_display() -> CharacterThirdPersonDisplay:
 	return third_person_display_
+
+func ability_trigger_state_machine() -> CharacterAbilityTriggerStateMachine:
+	return ability_trigger_state_machine_
+
+func ability_action() -> CharacterAbilityPrintAction:
+	return ability_action_
+
+func __add_child_if_not_null(node: Node) -> void:
+	if node != null:
+		add_child(node)
