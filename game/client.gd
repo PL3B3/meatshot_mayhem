@@ -128,10 +128,9 @@ func _physics_process(_delta):
 	client_state_timeline_.add_next_state(next_state)
 	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
 	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
-	network_messenger_.send_message_to_server({
-		"input": latest_input.to_dict(), 
-		"tick": tick_for_state_computed_using_latest_input
-	})
+	var input_message_to_export := ClientToServerInputMessage.new(
+		tick_for_state_computed_using_latest_input, latest_input)
+	network_messenger_.send_message_to_server(input_message_to_export.to_dict())
 
 func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
 	if client_state_buffer_ == null:

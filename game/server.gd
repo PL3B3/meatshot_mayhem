@@ -22,14 +22,15 @@ func _ready() -> void:
 	messenger.received_client_message.connect(_handle_client_message)
 	map_spawner.spawn(null)
 
-func _handle_client_message(client_id: int, message: Dictionary) -> void:
+func _handle_client_message(client_id: int, serialized_message: Dictionary) -> void:
+	var client_message := ClientToServerInputMessage.from_dict(serialized_message)
 	if client_id in client_resources_per_peer_id_:
 		var client_resources: InputBufferAndCharacterEntity = client_resources_per_peer_id_[client_id]
 		var input_buffer_for_client: TickAwareQueue = client_resources.input_buffer
-		var client_input: InputState = InputState.from_dict(message["input"])
-		input_buffer_for_client.push(client_input, message["tick"])
+		var client_input: InputState = client_message.input_state()
+		input_buffer_for_client.push(client_input, client_message.client_tick())
 	else:
-		print("Cannot enqueue input message %s from client %d. No input buffer initialized." % [message, client_id])
+		print("Cannot enqueue input serialized_message %s from client %d. No input buffer initialized." % [serialized_message, client_id])
 
 func _on_client_connected(id: int) -> void:
 	__initialize_resources_for_new_client(id)

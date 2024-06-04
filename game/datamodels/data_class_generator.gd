@@ -110,7 +110,26 @@ func _ready():
 		]
 	}
 	"""
-	print(DataClassGenerator.generate_data_class(json_spec_4))
+	var json_spec_5 = """
+	{
+		"name": "ClientToServerInputMessage",
+		"properties": [
+			{
+				"name": "client_tick",
+				"type": "int"
+			},
+			{
+				"name": "input_state",
+				"type": "InputState"
+			},
+			{
+				"name": "is_triggered",
+				"type": "bool"
+			}
+		]
+	}
+	"""
+	print(DataClassGenerator.generate_data_class(json_spec_5))
 
 static func generate_data_class(json_spec: String):
 	var json_parser = JSON.new()
