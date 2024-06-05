@@ -6,7 +6,7 @@ const SPAWN_POINT = Vector3(0, 2.5, 0)
 const OVERWRITE_EXISTING = true
 static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
 static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> TickAwareQueue: 
-	return TickAwareQueue.new("sv_input_buf[%10d]" % x, InputState.DEFAULT)
+	return TickAwareQueue.new("sv_input_buf[%10d]" % x, ClientInput.new(InputState.DEFAULT, false))
 static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 
 @onready var messenger: NetworkMessenger = $NetworkMessenger
@@ -28,7 +28,7 @@ func _handle_client_message(client_id: int, serialized_message: Dictionary) -> v
 	if client_id in client_resources_per_peer_id_:
 		var client_resources: InputBufferAndCharacterEntity = client_resources_per_peer_id_[client_id]
 		var input_buffer_for_client: TickAwareQueue = client_resources.input_buffer
-		var client_input: InputState = client_message.input_state()
+		var client_input := client_message.client_input()
 		input_buffer_for_client.push(client_input, client_message.client_tick())
 	else:
 		print("Cannot enqueue input serialized_message %s from client %d. No input buffer initialized." % [serialized_message, client_id])
@@ -44,13 +44,13 @@ func _physics_process(_delta: float) -> void:
 	for client_id: int in client_resources_per_peer_id_:
 		var client_input_buffer_and_character: InputBufferAndCharacterEntity = client_resources_per_peer_id_[client_id]
 		var latest_client_input_with_tick: QueueItem = client_input_buffer_and_character.input_buffer.pop()
-		var latest_input: InputState = latest_client_input_with_tick.value()
+		var latest_client_input: ClientInput = latest_client_input_with_tick.value()
 		var client_tick_for_input: int = latest_client_input_with_tick.tick()
 		var character_entity_id: int = client_input_buffer_and_character.character_entity.entity_id
 		var character_physics_state: CharacterPhysicsState = Utils.get_or_default(
 			world_state_, character_entity_id, client_input_buffer_and_character.character_entity.state_data)
 		character_resource_per_client_id[client_id] = ServerCharacterResource.new(
-			latest_input,
+			latest_client_input,
 			client_tick_for_input,
 			character_entity_id,
 			character_physics_state,
@@ -62,10 +62,13 @@ func _physics_process(_delta: float) -> void:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		var character_entity_id := character_resource.character_entity_id
 		var character_components := character_resource.character_components
+		var latest_input_state := character_resource.input.input_state()
 		var next_physics_state := character_components.movement_body().compute_next_physics_state(
-				character_resource.current_physics_state, character_resource.input)
+				character_resource.current_physics_state, latest_input_state)
 		var character_transform_state := CharacterTransformState.new(
-			next_physics_state.position(), character_resource.input.pitch(), character_resource.input.yaw())
+			next_physics_state.position(), latest_input_state.pitch(), latest_input_state.yaw())
+		if character_resource.input.is_triggered():
+			character_components.ability_action().do_ability()
 		character_components.first_person_display().display_character_transform(character_transform_state)
 		character_components.third_person_display().display_character_transform(character_transform_state)
 
@@ -136,14 +139,14 @@ class InputBufferAndCharacterEntity:
 		self.character_entity = character_entity
 
 class ServerCharacterResource:
-	var input: InputState
+	var input: ClientInput
 	var client_tick: int
 	var character_entity_id: int
 	var current_physics_state: CharacterPhysicsState
 	var character_components: CharacterComponents
 
 	func _init(
-		input: InputState, 
+		input: ClientInput, 
 		client_tick: int,
 		character_entity_id: int,
 		current_physics_state: CharacterPhysicsState,

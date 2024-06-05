@@ -135,7 +135,8 @@ func _physics_process(_delta):
 	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
 	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
 	var input_message_to_export := ClientToServerInputMessage.new(
-		tick_for_state_computed_using_latest_input, latest_input)
+		tick_for_state_computed_using_latest_input, 
+		ClientInput.new(latest_input, ability_trigger_result.is_triggered))
 	network_messenger_.send_message_to_server(input_message_to_export.to_dict())
 
 func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
