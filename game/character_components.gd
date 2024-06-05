@@ -34,14 +34,14 @@ static func create_for_network_mode(network_mode: int) -> CharacterComponents:
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
 				THIRD_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
-				CharacterAbilityPrintAction.new())
+				CharacterAbilityPrintAction.new("SERVER"))
 		CONSTANTS.NetworkEntityMode.OWN_CLIENT: 
 			return CharacterComponents.new(
 				MOVEMENT_BODY_SCENE.instantiate(), 
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
 				CharacterAbilityTriggerStateMachine.new(),
-				CharacterAbilityPrintAction.new())
+				CharacterAbilityPrintAction.new("CLIENT"))
 		CONSTANTS.NetworkEntityMode.OTHER_CLIENT:
 			return CharacterComponents.new(
 				null, 
