@@ -25,6 +25,7 @@ func _init(
 	__add_child_if_not_null(movement_body)
 	__add_child_if_not_null(first_person_display)
 	__add_child_if_not_null(third_person_display)
+	__add_child_if_not_null(ability_action)
 
 static func create_for_network_mode(network_mode: int) -> CharacterComponents:
 	match network_mode:
@@ -34,14 +35,14 @@ static func create_for_network_mode(network_mode: int) -> CharacterComponents:
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
 				THIRD_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
-				CharacterAbilityPrintAction.new("SERVER"))
+				CharacterAbilityHitscanAction.new())
 		CONSTANTS.NetworkEntityMode.OWN_CLIENT: 
 			return CharacterComponents.new(
 				MOVEMENT_BODY_SCENE.instantiate(), 
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
 				CharacterAbilityTriggerStateMachine.new(),
-				CharacterAbilityPrintAction.new("CLIENT"))
+				CharacterAbilityHitscanAction.new())
 		CONSTANTS.NetworkEntityMode.OTHER_CLIENT:
 			return CharacterComponents.new(
 				null, 

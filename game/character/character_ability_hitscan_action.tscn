@@ -1,0 +1,3 @@
+[gd_scene format=3 uid="uid://bsp54fs6vu0u"]
+
+[node name="CharacterAbilityHitscanAction" type="Node3D"]
