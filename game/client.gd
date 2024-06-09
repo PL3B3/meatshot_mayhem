@@ -125,7 +125,7 @@ func _physics_process(_delta):
 	var ability_trigger_result := own_character_components.ability_trigger_state_machine().compute_trigger_result(
 		current_state.own_character_state().ability_trigger_state(), latest_input)
 	if ability_trigger_result.is_triggered:
-		own_character_components.ability_action().do_ability()
+		own_character_components.ability_action().perform_ability(Transform3D(), [])
 	
 	var next_own_character_state := ClientOwnCharacterState.new(
 		next_own_character_physics_state, ability_trigger_result.next_trigger_state)

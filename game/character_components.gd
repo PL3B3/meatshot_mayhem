@@ -9,14 +9,14 @@ var movement_body_: CharacterMovementActuator
 var first_person_display_: CharacterFirstPersonOutput
 var third_person_display_: CharacterThirdPersonDisplay
 var ability_trigger_state_machine_: CharacterAbilityTriggerStateMachine
-var ability_action_: CharacterAbilityPrintAction
+var ability_action_: AbstractCharacterAbilityAction
 
 func _init(
 	movement_body: CharacterMovementActuator, 
 	first_person_display: CharacterFirstPersonOutput, 
 	third_person_display: CharacterThirdPersonDisplay,
 	ability_trigger_state_machine: CharacterAbilityTriggerStateMachine,
-	ability_action: CharacterAbilityPrintAction) -> void:
+	ability_action: AbstractCharacterAbilityAction) -> void:
 	movement_body_ = movement_body
 	first_person_display_ = first_person_display
 	third_person_display_ = third_person_display
@@ -65,7 +65,7 @@ func third_person_display() -> CharacterThirdPersonDisplay:
 func ability_trigger_state_machine() -> CharacterAbilityTriggerStateMachine:
 	return ability_trigger_state_machine_
 
-func ability_action() -> CharacterAbilityPrintAction:
+func ability_action() -> AbstractCharacterAbilityAction:
 	return ability_action_
 
 func __add_child_if_not_null(node: Node) -> void:
