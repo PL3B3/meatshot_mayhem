@@ -116,7 +116,8 @@ func _physics_process(_delta):
 			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
 	
-	__display_own_character(own_character_transform_state, own_character_components.first_person_display())
+	var current_camera_transform: Transform3D = __display_own_character(
+		own_character_transform_state, own_character_components.first_person_display())
 	__display_remote_characters(remote_character_resources)
 	var next_own_character_physics_state: CharacterPhysicsState = __compute_next_physics_state(
 		optionally_reconciled_own_character_physics_state, 
@@ -125,7 +126,10 @@ func _physics_process(_delta):
 	var ability_trigger_result := own_character_components.ability_trigger_state_machine().compute_trigger_result(
 		current_state.own_character_state().ability_trigger_state(), latest_input)
 	if ability_trigger_result.is_triggered:
-		own_character_components.ability_action().perform_ability(Transform3D(), [])
+		var remote_character_positions: Array[Vector3] = []
+		for remote_resource in remote_character_resources:
+			remote_character_positions.push_back(remote_resource.transform_state().position())
+		own_character_components.ability_action().perform_ability(current_camera_transform, remote_character_positions)
 	
 	var next_own_character_state := ClientOwnCharacterState.new(
 		next_own_character_physics_state, ability_trigger_result.next_trigger_state)
@@ -204,8 +208,8 @@ static func __compute_next_physics_state(
 
 static func __display_own_character(
 	character_transform: CharacterTransformState,
-	first_person_display: CharacterFirstPersonOutput):
-	first_person_display.display_character_transform(character_transform)
+	first_person_display: CharacterFirstPersonOutput) -> Transform3D:
+	return first_person_display.display_character_transform(character_transform)
 
 static func __display_remote_characters(remote_character_resources: Array[RemoteCharacterResource]):
 	for remote_character_resource in remote_character_resources:

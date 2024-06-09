@@ -67,9 +67,13 @@ func _physics_process(_delta: float) -> void:
 				character_resource.current_physics_state, latest_input_state)
 		var character_transform_state := CharacterTransformState.new(
 			next_physics_state.position(), latest_input_state.pitch(), latest_input_state.yaw())
+		var character_camera_transform: Transform3D = (
+			character_components.first_person_display().display_character_transform(character_transform_state))
 		if character_resource.input.is_triggered():
-			character_components.ability_action().perform_ability(Transform3D(), [])
-		character_components.first_person_display().display_character_transform(character_transform_state)
+			var other_character_positions_during_current_tick := (
+				__extract_positions_for_other_characters(world_state_, character_entity_id))
+			character_components.ability_action().perform_ability(
+				character_camera_transform, other_character_positions_during_current_tick)
 		character_components.third_person_display().display_character_transform(character_transform_state)
 
 		next_world_state[character_entity_id] = next_physics_state
@@ -120,6 +124,14 @@ static func __extract_states_for_remote_characters(
 			var remote_character_entity_id: int = client_snapshot_data.character_entity_id
 			states_for_remote_characters[remote_character_entity_id] = client_snapshot_data.transform_state
 	return states_for_remote_characters
+
+func __extract_positions_for_other_characters(world_state: Dictionary, own_character_entity_id: int) -> Array[Vector3]:
+	var other_character_positions: Array[Vector3] = []
+	for character_entity_id: int in world_state:
+		if character_entity_id != own_character_entity_id:
+			var other_character_state: CharacterPhysicsState = world_state[character_entity_id]
+			other_character_positions.push_back(other_character_state.position())
+	return other_character_positions
 
 static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: InputState) -> CharacterPhysicsState:
 	if input.is_slow_walking():
