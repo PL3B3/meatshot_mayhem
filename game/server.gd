@@ -76,8 +76,9 @@ func _physics_process(_delta: float) -> void:
 				character_resource.current_physics_state, latest_input_state)
 		var character_transform_state := CharacterTransformState.new(
 			next_physics_state.position(), latest_input_state.pitch(), latest_input_state.yaw())
+		character_components.first_person_display().display_character_transform(character_transform_state)
 		var character_camera_transform: Transform3D = (
-			character_components.first_person_display().display_character_transform(character_transform_state))
+			character_components.first_person_display().compute_camera_transform(character_transform_state))
 		if character_resource.input.is_triggered():
 			var other_character_positions_during_current_tick := (
 				__extract_positions_for_other_characters(world_state_, character_entity_id))
