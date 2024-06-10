@@ -121,24 +121,8 @@ func _physics_process(_delta):
 			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
 	
-	for remote_character_entity_id: int in pending_remote_character_triggers_:
-		if remote_character_entity_id in latest_remote_character_state_per_entity_id:
-			var remote_character_state: CharacterTransformState = (
-				latest_remote_character_state_per_entity_id[remote_character_entity_id])
-			var remote_character_components: CharacterComponents = entity_spawner_.get_or_spawn_character(
-				remote_character_entity_id, CONSTANTS.NetworkEntityMode.OTHER_CLIENT)
-			var remote_character_camera_rotation_in_euler_angles := Vector3(
-				deg_to_rad(remote_character_state.pitch()), deg_to_rad(remote_character_state.yaw()), 0)
-			var remote_character_camera_transform := Transform3D(
-				Basis.from_euler(remote_character_camera_rotation_in_euler_angles),
-				remote_character_state.position() + Vector3(0, 0.75, 0))
-			remote_character_components.ability_action().perform_ability(
-				remote_character_camera_transform, 
-				__extract_positions_for_characters_except_remote_character(
-					own_character_physics_state.position(),
-					latest_remote_character_state_per_entity_id,
-					remote_character_entity_id))
-	pending_remote_character_triggers_.clear()
+	__perform_remote_character_abilities(
+		own_character_physics_state.position(), latest_remote_character_state_per_entity_id)
 	
 	__display_own_character(own_character_transform_state, own_character_components.first_person_display())
 	__display_remote_characters(remote_character_resources)
@@ -167,6 +151,28 @@ func _physics_process(_delta):
 		tick_for_state_computed_using_latest_input, 
 		ClientInput.new(latest_input, ability_trigger_result.is_triggered))
 	network_messenger_.send_message_to_server(input_message_to_export.to_dict())
+
+func __perform_remote_character_abilities(
+		own_character_position: Vector3, 
+		latest_remote_character_state_per_entity_id: Dictionary) -> void:
+	for remote_character_entity_id: int in pending_remote_character_triggers_:
+		if remote_character_entity_id in latest_remote_character_state_per_entity_id:
+			var remote_character_state: CharacterTransformState = (
+				latest_remote_character_state_per_entity_id[remote_character_entity_id])
+			var remote_character_components: CharacterComponents = entity_spawner_.get_or_spawn_character(
+				remote_character_entity_id, CONSTANTS.NetworkEntityMode.OTHER_CLIENT)
+			var remote_character_camera_rotation_in_euler_angles := Vector3(
+				deg_to_rad(remote_character_state.pitch()), deg_to_rad(remote_character_state.yaw()), 0)
+			var remote_character_camera_transform := Transform3D(
+				Basis.from_euler(remote_character_camera_rotation_in_euler_angles),
+				remote_character_state.position() + Vector3(0, 0.75, 0))
+			remote_character_components.ability_action().perform_ability(
+				remote_character_camera_transform, 
+				__extract_positions_for_characters_except_remote_character(
+					own_character_position,
+					latest_remote_character_state_per_entity_id,
+					remote_character_entity_id))
+	pending_remote_character_triggers_.clear()
 
 func __extract_positions_for_characters_except_remote_character(
 		own_character_position: Vector3,

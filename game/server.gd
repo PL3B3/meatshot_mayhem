@@ -77,14 +77,6 @@ func _physics_process(_delta: float) -> void:
 		var character_transform_state := CharacterTransformState.new(
 			next_physics_state.position(), latest_input_state.pitch(), latest_input_state.yaw())
 		character_components.first_person_display().display_character_transform(character_transform_state)
-		var character_camera_transform: Transform3D = (
-			character_components.first_person_display().compute_camera_transform(character_transform_state))
-		if character_resource.input.is_triggered():
-			var other_character_positions_during_current_tick := (
-				__extract_positions_for_other_characters(world_state_, character_entity_id))
-			character_components.ability_action().perform_ability(
-				character_camera_transform, other_character_positions_during_current_tick)
-			trigger_ability_for_remote_character.rpc(character_entity_id)
 		character_components.third_person_display().display_character_transform(character_transform_state)
 
 		next_world_state[character_entity_id] = next_physics_state
@@ -93,7 +85,9 @@ func _physics_process(_delta: float) -> void:
 			next_physics_state,
 			character_transform_state,
 			character_entity_id)
-	
+		
+	__perform_character_abilities(world_state_, character_resource_per_client_id)
+
 	world_state_ = next_world_state
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
@@ -119,6 +113,25 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 		messenger.send_message_to_client(client_id, state_snapshot_for_client.to_dict())
 	return state_snapshots_for_clients
 
+static func __perform_character_abilities(world_state: Dictionary, character_resource_per_client_id: Dictionary) -> void:
+	for client_id: int in character_resource_per_client_id:
+		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
+		if character_resource.input.is_triggered():
+			var character_entity_id := character_resource.character_entity_id
+			var character_components := character_resource.character_components
+			var latest_input_state := character_resource.input.input_state()
+			var character_transform_state := CharacterTransformState.new(
+				character_resource.current_physics_state.position(), 
+				latest_input_state.pitch(), 
+				latest_input_state.yaw())
+			var character_camera_transform: Transform3D = (
+				character_components.first_person_display().compute_camera_transform(character_transform_state))
+			var other_character_positions_during_current_tick := (
+				__extract_positions_for_other_characters(world_state, character_entity_id))
+			character_components.ability_action().perform_ability(
+				character_camera_transform, other_character_positions_during_current_tick)
+			trigger_ability_for_remote_character.rpc(character_entity_id)
+
 static func __extract_states_for_remote_characters(
 	data_to_export_per_client: Dictionary, 
 	own_client_id: int) -> Dictionary:
@@ -130,7 +143,9 @@ static func __extract_states_for_remote_characters(
 			states_for_remote_characters[remote_character_entity_id] = client_snapshot_data.transform_state
 	return states_for_remote_characters
 
-func __extract_positions_for_other_characters(world_state: Dictionary, own_character_entity_id: int) -> Array[Vector3]:
+static func __extract_positions_for_other_characters(
+		world_state: Dictionary, 
+		own_character_entity_id: int) -> Array[Vector3]:
 	var other_character_positions: Array[Vector3] = []
 	for character_entity_id: int in world_state:
 		if character_entity_id != own_character_entity_id:
