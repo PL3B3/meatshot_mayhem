@@ -21,6 +21,7 @@ const ENABLE_LOGGING := false
 
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_state_buffer_: RefillingQueue
+var pending_remote_character_triggers_: Array[int] = []
 var warmed_up = false
 
 func _ready():
@@ -45,6 +46,10 @@ func resize_window(index=0):
 	var screen_size: Vector2 = DisplayServer.screen_get_size()
 	get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
 	get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
+
+@rpc("authority", "reliable")
+func trigger_ability_for_remote_character(remote_character_entity_id: int):
+	pending_remote_character_triggers_.append(remote_character_entity_id)
 
 func _handle_server_message(message: Dictionary):
 	var server_snapshot := ServerToClientStateSnapshotMessage.from_dict(message)
@@ -116,6 +121,25 @@ func _physics_process(_delta):
 			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
 	
+	for remote_character_entity_id: int in pending_remote_character_triggers_:
+		if remote_character_entity_id in latest_remote_character_state_per_entity_id:
+			var remote_character_state: CharacterTransformState = (
+				latest_remote_character_state_per_entity_id[remote_character_entity_id])
+			var remote_character_components: CharacterComponents = entity_spawner_.get_or_spawn_character(
+				remote_character_entity_id, CONSTANTS.NetworkEntityMode.OTHER_CLIENT)
+			var remote_character_camera_rotation_in_euler_angles := Vector3(
+				deg_to_rad(remote_character_state.pitch()), deg_to_rad(remote_character_state.yaw()), 0)
+			var remote_character_camera_transform := Transform3D(
+				Basis.from_euler(remote_character_camera_rotation_in_euler_angles),
+				remote_character_state.position() + Vector3(0, 0.75, 0))
+			remote_character_components.ability_action().perform_ability(
+				remote_character_camera_transform, 
+				__extract_positions_for_characters_except_remote_character(
+					own_character_physics_state.position(),
+					latest_remote_character_state_per_entity_id,
+					remote_character_entity_id))
+	pending_remote_character_triggers_.clear()
+	
 	var current_camera_transform: Transform3D = __display_own_character(
 		own_character_transform_state, own_character_components.first_person_display())
 	__display_remote_characters(remote_character_resources)
@@ -142,6 +166,19 @@ func _physics_process(_delta):
 		tick_for_state_computed_using_latest_input, 
 		ClientInput.new(latest_input, ability_trigger_result.is_triggered))
 	network_messenger_.send_message_to_server(input_message_to_export.to_dict())
+
+func __extract_positions_for_characters_except_remote_character(
+		own_character_position: Vector3,
+		latest_remote_character_state_per_entity_id: Dictionary,
+		remote_character_entity_id_to_exclude: int) -> Array[Vector3]:
+	var positions_for_all_but_specified_character: Array[Vector3] = []
+	positions_for_all_but_specified_character.push_back(own_character_position)
+	for remote_character_entity_id: int in latest_remote_character_state_per_entity_id:
+		if remote_character_entity_id != remote_character_entity_id_to_exclude:
+			var remote_character_transform: CharacterTransformState = (
+				latest_remote_character_state_per_entity_id[remote_character_entity_id])
+			positions_for_all_but_specified_character.push_back(remote_character_transform.position())
+	return positions_for_all_but_specified_character
 
 func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
 	if client_state_buffer_ == null:

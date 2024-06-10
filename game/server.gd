@@ -74,6 +74,7 @@ func _physics_process(_delta: float) -> void:
 				__extract_positions_for_other_characters(world_state_, character_entity_id))
 			character_components.ability_action().perform_ability(
 				character_camera_transform, other_character_positions_during_current_tick)
+			trigger_ability_for_remote_character.rpc(character_entity_id)
 		character_components.third_person_display().display_character_transform(character_transform_state)
 
 		next_world_state[character_entity_id] = next_physics_state
@@ -92,6 +93,9 @@ func resize_window(index: int = 0)  -> void:
 	var screen_size: Vector2 = DisplayServer.screen_get_size()
 	get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
 	get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
+
+@rpc("authority", "reliable")
+func trigger_ability_for_remote_character(remote_character_entity_id: int): pass
 
 func __initialize_resources_for_new_client(client_id: int) -> void:
 	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()

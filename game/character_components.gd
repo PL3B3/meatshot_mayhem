@@ -49,7 +49,7 @@ static func create_for_network_mode(network_mode: int) -> CharacterComponents:
 				null,
 				THIRD_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
-				null)
+				CharacterAbilityHitscanAction.new())
 		_:
 			push_error("Network mode %d is not a value of NetworkEntityMode. Returning null" % network_mode)
 			return null
