@@ -17,6 +17,15 @@ static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 var client_resources_per_peer_id_ := {}
 var world_state_ := {}
 
+@rpc("authority", "call_local", "reliable")
+func resize_window(index: int = 0)  -> void:
+	var screen_size: Vector2 = DisplayServer.screen_get_size()
+	get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
+	get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
+
+@rpc("authority", "reliable")
+func trigger_ability_for_remote_character(remote_character_entity_id: int): pass
+
 func _ready() -> void:
 	resize_window()
 	multiplayer.peer_connected.connect(_on_client_connected)
@@ -87,15 +96,6 @@ func _physics_process(_delta: float) -> void:
 	world_state_ = next_world_state
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
-
-@rpc("authority", "call_local", "reliable")
-func resize_window(index: int = 0)  -> void:
-	var screen_size: Vector2 = DisplayServer.screen_get_size()
-	get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
-	get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
-
-@rpc("authority", "reliable")
-func trigger_ability_for_remote_character(remote_character_entity_id: int): pass
 
 func __initialize_resources_for_new_client(client_id: int) -> void:
 	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()

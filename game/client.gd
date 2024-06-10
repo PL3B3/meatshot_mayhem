@@ -24,6 +24,16 @@ var client_state_buffer_: RefillingQueue
 var pending_remote_character_triggers_: Array[int] = []
 var warmed_up = false
 
+@rpc("authority", "call_local", "reliable")
+func resize_window(index=0):
+	var screen_size: Vector2 = DisplayServer.screen_get_size()
+	get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
+	get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
+
+@rpc("authority", "reliable")
+func trigger_ability_for_remote_character(remote_character_entity_id: int):
+	pending_remote_character_triggers_.append(remote_character_entity_id)
+
 func _ready():
 	resize_window()
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
@@ -40,16 +50,6 @@ func start_client():
 		return error
 	multiplayer.multiplayer_peer = peer
 	print("PEERS COUNT: ", multiplayer.get_peers().size())
-
-@rpc("authority", "call_local", "reliable")
-func resize_window(index=0):
-	var screen_size: Vector2 = DisplayServer.screen_get_size()
-	get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
-	get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
-
-@rpc("authority", "reliable")
-func trigger_ability_for_remote_character(remote_character_entity_id: int):
-	pending_remote_character_triggers_.append(remote_character_entity_id)
 
 func _handle_server_message(message: Dictionary):
 	var server_snapshot := ServerToClientStateSnapshotMessage.from_dict(message)
