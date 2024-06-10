@@ -2,11 +2,10 @@ extends Node3D
 
 class_name CharacterThirdPersonDisplay
 
-@onready var mesh = $Body
+@onready var eye_pivot_: Node3D = $EyePivot
 
-func display_character_transform(character_transform: CharacterTransformState):
-	mesh.global_position = character_transform.position()
-	var character_rotation_in_euler_angles = Vector3(
-		deg_to_rad(character_transform.pitch()), deg_to_rad(character_transform.yaw()), 0)
-	mesh.basis = Quaternion.from_euler(character_rotation_in_euler_angles)
+func display_character_transform(character_transform: CharacterTransformState) -> void:
+	position = character_transform.position()
+	rotation_degrees.y = character_transform.yaw()
+	eye_pivot_.rotation_degrees.x = character_transform.pitch()
 
