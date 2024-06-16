@@ -1,3 +1,6 @@
-[gd_scene format=3 uid="uid://bsp54fs6vu0u"]
+[gd_scene load_steps=2 format=3 uid="uid://bsp54fs6vu0u"]
+
+[ext_resource type="Script" path="res://game/character/character_ability_hitscan_action.gd" id="1_hhige"]
 
 [node name="CharacterAbilityHitscanAction" type="Node3D"]
+script = ExtResource("1_hhige")
