@@ -86,7 +86,8 @@ func _physics_process(_delta: float) -> void:
 			character_transform_state,
 			character_entity_id)
 		
-	__perform_character_abilities(world_state_, character_resource_per_client_id)
+	var hitscan_results := __perform_character_abilities(world_state_, character_resource_per_client_id)
+	__draw_bullet_tracers(hitscan_results)
 
 	world_state_ = next_world_state
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
@@ -113,7 +114,16 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 		messenger.send_message_to_client(client_id, state_snapshot_for_client.to_dict())
 	return state_snapshots_for_clients
 
-static func __perform_character_abilities(world_state: Dictionary, character_resource_per_client_id: Dictionary) -> void:
+func __draw_bullet_tracers(hitscan_results: Array[HitscanResult]) -> void:
+	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
+	for hitscan_result: HitscanResult in hitscan_results:
+		tracer_displayer.add_tracer(hitscan_result.origin, hitscan_result.hit_point)
+	tracer_displayer.display_and_update_tracers()
+
+static func __perform_character_abilities(
+		world_state: Dictionary, 
+		character_resource_per_client_id: Dictionary) -> Array[HitscanResult]:
+	var hitscan_ability_results: Array[HitscanResult] = []
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		if character_resource.input.is_triggered():
@@ -128,9 +138,11 @@ static func __perform_character_abilities(world_state: Dictionary, character_res
 				character_components.first_person_display().compute_camera_transform(character_transform_state))
 			var other_character_positions_during_current_tick := (
 				__extract_positions_for_other_characters(world_state, character_entity_id))
-			character_components.ability_action().perform_ability(
+			var ability_result := character_components.ability_action().perform_ability(
 				character_camera_transform, other_character_positions_during_current_tick)
+			hitscan_ability_results.append_array(ability_result.hitscan_results)
 			trigger_ability_for_remote_character.rpc(character_entity_id)
+	return hitscan_ability_results
 
 static func __extract_states_for_remote_characters(
 	data_to_export_per_client: Dictionary, 

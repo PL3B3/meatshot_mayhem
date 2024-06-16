@@ -1,7 +1,7 @@
 extends Object
 class_name CharacterAbilityTriggerStateMachine
 
-const MINIMUM_TICK_INTERVAL_BETWEEN_TRIGGERS: int = 60
+const MINIMUM_TICK_INTERVAL_BETWEEN_TRIGGERS: int = 30
 const TRIGGERED := true
 const NOT_TRIGGERED := false
 

@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3 uid="uid://dwv43b0xw2drf"]
+
+[ext_resource type="Script" path="res://game/tracer_displayer.gd" id="1_aooar"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_aer2n"]
+cull_mode = 2
+shading_mode = 0
+disable_ambient_light = true
+disable_fog = true
+albedo_color = Color(0.803922, 0, 0.231373, 1)
+disable_receive_shadows = true
+
+[node name="TracerDisplayer" type="MeshInstance3D"]
+material_override = SubResource("StandardMaterial3D_aer2n")
+cast_shadow = 0
+script = ExtResource("1_aooar")

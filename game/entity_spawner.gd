@@ -2,9 +2,11 @@ extends Node
 class_name EntitySpawner
 
 const DUMMY_DICTIONARY_VALUE := true
+const TRACER_DISPLAYER_SCENE := preload("res://game/tracer_displayer.tscn")
 
 var client_own_character_: CharacterComponents
 var character_components_per_entity_id_ := {}
+var tracer_displayer_: TracerDisplayer
 
 func get_or_spawn_client_own_character() -> CharacterComponents:
 	if client_own_character_ != null:
@@ -23,6 +25,13 @@ func get_or_spawn_character(entity_id: int, network_mode: int) -> CharacterCompo
 		add_child(character_components)
 		character_components_per_entity_id_[entity_id] = character_components
 		return character_components
+
+func get_or_create_tracer_displayer() -> TracerDisplayer:
+	if tracer_displayer_ == null:
+		var tracer_displayer: TracerDisplayer = TRACER_DISPLAYER_SCENE.instantiate()
+		add_child(tracer_displayer)
+		tracer_displayer_ = tracer_displayer
+	return tracer_displayer_
 
 func despawn_entities_not_in_client_snapshot(client_state_snapshot: ClientStateSnapshot) -> void:
 	var entity_ids_in_snapshot: Dictionary = {}

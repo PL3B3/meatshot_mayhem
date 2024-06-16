@@ -4,6 +4,7 @@ class_name CharacterComponents
 const MOVEMENT_BODY_SCENE := preload("res://game/movement/character_movement_actuator.tscn")
 const FIRST_PERSON_DISPLAY_SCENE := preload("res://game/character/character_first_person_display_output.tscn")
 const THIRD_PERSON_DISPLAY_SCENE := preload("res://game/character/character_third_person_display.tscn")
+const HITSCAN_ACTION_SCENE := preload("res://game/character/character_ability_hitscan_action.tscn")
 
 var movement_body_: CharacterMovementActuator
 var first_person_display_: CharacterFirstPersonOutput
@@ -35,21 +36,21 @@ static func create_for_network_mode(network_mode: int) -> CharacterComponents:
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
 				THIRD_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
-				CharacterAbilityHitscanAction.new())
+				HITSCAN_ACTION_SCENE.instantiate())
 		CONSTANTS.NetworkEntityMode.OWN_CLIENT: 
 			return CharacterComponents.new(
 				MOVEMENT_BODY_SCENE.instantiate(), 
 				FIRST_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
 				CharacterAbilityTriggerStateMachine.new(),
-				CharacterAbilityHitscanAction.new())
+				HITSCAN_ACTION_SCENE.instantiate())
 		CONSTANTS.NetworkEntityMode.OTHER_CLIENT:
 			return CharacterComponents.new(
 				null, 
 				null,
 				THIRD_PERSON_DISPLAY_SCENE.instantiate(),
 				null,
-				CharacterAbilityHitscanAction.new())
+				HITSCAN_ACTION_SCENE.instantiate())
 		_:
 			push_error("Network mode %d is not a value of NetworkEntityMode. Returning null" % network_mode)
 			return null

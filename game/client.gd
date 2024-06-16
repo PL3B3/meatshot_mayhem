@@ -121,15 +121,13 @@ func _physics_process(_delta):
 			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
 	
-	__perform_remote_character_abilities(
-		own_character_physics_state.position(), latest_remote_character_state_per_entity_id)
-	
 	__display_own_character(own_character_transform_state, own_character_components.first_person_display())
 	__display_remote_characters(remote_character_resources)
 	var next_own_character_physics_state: CharacterPhysicsState = __compute_next_physics_state(
 		optionally_reconciled_own_character_physics_state, 
 		own_character_components.movement_body(), 
 		latest_input)
+	var hitscan_ability_results: Array[HitscanResult] = []
 	var ability_trigger_result := own_character_components.ability_trigger_state_machine().compute_trigger_result(
 		current_state.own_character_state().ability_trigger_state(), latest_input)
 	if ability_trigger_result.is_triggered:
@@ -138,8 +136,16 @@ func _physics_process(_delta):
 			remote_character_positions.push_back(remote_resource.transform_state().position())
 		var current_camera_transform := (
 			own_character_components.first_person_display().compute_camera_transform(own_character_transform_state))
-		own_character_components.ability_action().perform_ability(current_camera_transform, remote_character_positions)
+		var ability_result := own_character_components.ability_action().perform_ability(
+			current_camera_transform, remote_character_positions)
+		hitscan_ability_results.append_array(ability_result.hitscan_results)
 	
+	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
+		own_character_physics_state.position(), latest_remote_character_state_per_entity_id)
+	hitscan_ability_results.append_array(remote_character_hitscan_ability_results)
+	
+	__draw_bullet_tracers(hitscan_ability_results)
+
 	var next_own_character_state := ClientOwnCharacterState.new(
 		next_own_character_physics_state, ability_trigger_result.next_trigger_state)
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
@@ -154,7 +160,8 @@ func _physics_process(_delta):
 
 func __perform_remote_character_abilities(
 		own_character_position: Vector3, 
-		latest_remote_character_state_per_entity_id: Dictionary) -> void:
+		latest_remote_character_state_per_entity_id: Dictionary) -> Array[HitscanResult]:
+	var remote_character_hitscan_ability_results: Array[HitscanResult] = []
 	for remote_character_entity_id: int in pending_remote_character_triggers_:
 		if remote_character_entity_id in latest_remote_character_state_per_entity_id:
 			var remote_character_state: CharacterTransformState = (
@@ -166,13 +173,15 @@ func __perform_remote_character_abilities(
 			var remote_character_camera_transform := Transform3D(
 				Basis.from_euler(remote_character_camera_rotation_in_euler_angles),
 				remote_character_state.position() + Vector3(0, 0.75, 0))
-			remote_character_components.ability_action().perform_ability(
+			var ability_result := remote_character_components.ability_action().perform_ability(
 				remote_character_camera_transform, 
 				__extract_positions_for_characters_except_remote_character(
 					own_character_position,
 					latest_remote_character_state_per_entity_id,
 					remote_character_entity_id))
+			remote_character_hitscan_ability_results.append_array(ability_result.hitscan_results)
 	pending_remote_character_triggers_.clear()
+	return remote_character_hitscan_ability_results
 
 func __extract_positions_for_characters_except_remote_character(
 		own_character_position: Vector3,
@@ -186,6 +195,12 @@ func __extract_positions_for_characters_except_remote_character(
 				latest_remote_character_state_per_entity_id[remote_character_entity_id])
 			positions_for_all_but_specified_character.push_back(remote_character_transform.position())
 	return positions_for_all_but_specified_character
+
+func __draw_bullet_tracers(hitscan_results: Array[HitscanResult]) -> void:
+	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
+	for hitscan_result: HitscanResult in hitscan_results:
+		tracer_displayer.add_tracer(hitscan_result.origin, hitscan_result.hit_point)
+	tracer_displayer.display_and_update_tracers()
 
 func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
 	if client_state_buffer_ == null:
