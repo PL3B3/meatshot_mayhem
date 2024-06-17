@@ -105,6 +105,7 @@ func _physics_process(_delta):
 		reconciliation_data = Optional.empty()
 	
 	var remote_character_resources: Array[RemoteCharacterResource] = []
+	var remote_character_latest_position_per_entity_id: Dictionary = {}
 	for remote_character_entity_id in latest_remote_character_state_per_entity_id:
 		var remote_character_state: CharacterTransformState = (
 			latest_remote_character_state_per_entity_id[remote_character_entity_id])
@@ -113,6 +114,7 @@ func _physics_process(_delta):
 		var remote_character_resource: RemoteCharacterResource = RemoteCharacterResource.new(
 			remote_character_state, remote_character_components.third_person_display())
 		remote_character_resources.push_back(remote_character_resource)
+		remote_character_latest_position_per_entity_id[remote_character_entity_id] = remote_character_state.position()
 
 	var optionally_reconciled_own_character_physics_state: CharacterPhysicsState = (
 		__reconcile_own_character_physics_state_with_authoritative_state(
@@ -131,13 +133,10 @@ func _physics_process(_delta):
 	var ability_trigger_result := own_character_components.ability_trigger_state_machine().compute_trigger_result(
 		current_state.own_character_state().ability_trigger_state(), latest_input)
 	if ability_trigger_result.is_triggered:
-		var remote_character_positions: Array[Vector3] = []
-		for remote_resource in remote_character_resources:
-			remote_character_positions.push_back(remote_resource.transform_state().position())
 		var current_camera_transform := (
 			own_character_components.first_person_display().compute_camera_transform(own_character_transform_state))
 		var ability_result := own_character_components.ability_action().perform_ability(
-			current_camera_transform, remote_character_positions)
+			current_camera_transform, remote_character_latest_position_per_entity_id)
 		hitscan_ability_results.append_array(ability_result.hitscan_results)
 	
 	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
@@ -186,14 +185,15 @@ func __perform_remote_character_abilities(
 func __extract_positions_for_characters_except_remote_character(
 		own_character_position: Vector3,
 		latest_remote_character_state_per_entity_id: Dictionary,
-		remote_character_entity_id_to_exclude: int) -> Array[Vector3]:
-	var positions_for_all_but_specified_character: Array[Vector3] = []
-	positions_for_all_but_specified_character.push_back(own_character_position)
+		remote_character_entity_id_to_exclude: int) -> Dictionary:
+	var positions_for_all_but_specified_character: Dictionary = {}
+	positions_for_all_but_specified_character[RaycastUtils.NO_ENTITY_HIT] = own_character_position
 	for remote_character_entity_id: int in latest_remote_character_state_per_entity_id:
 		if remote_character_entity_id != remote_character_entity_id_to_exclude:
 			var remote_character_transform: CharacterTransformState = (
 				latest_remote_character_state_per_entity_id[remote_character_entity_id])
-			positions_for_all_but_specified_character.push_back(remote_character_transform.position())
+			positions_for_all_but_specified_character[remote_character_entity_id] = (
+				remote_character_transform.position())
 	return positions_for_all_but_specified_character
 
 func __draw_bullet_tracers(hitscan_results: Array[HitscanResult]) -> void:

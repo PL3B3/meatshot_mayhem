@@ -157,13 +157,14 @@ static func __extract_states_for_remote_characters(
 
 static func __extract_positions_for_other_characters(
 		world_state: Dictionary, 
-		own_character_entity_id: int) -> Array[Vector3]:
-	var other_character_positions: Array[Vector3] = []
+		own_character_entity_id: int) -> Dictionary:
+	var other_character_positions_per_entity_id: Dictionary = {}
 	for character_entity_id: int in world_state:
 		if character_entity_id != own_character_entity_id:
 			var other_character_state: CharacterPhysicsState = world_state[character_entity_id]
-			other_character_positions.push_back(other_character_state.position())
-	return other_character_positions
+			other_character_positions_per_entity_id[character_entity_id] = (
+				other_character_state.position())
+	return other_character_positions_per_entity_id
 
 static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: InputState) -> CharacterPhysicsState:
 	if input.is_slow_walking():

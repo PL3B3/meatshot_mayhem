@@ -8,6 +8,6 @@ func _init(description: String) -> void:
 
 func perform_ability(
 		_camera_transform: Transform3D,
-		_remote_character_positions: Array[Vector3]) -> CharacterAbilityResult:
+		_remote_character_position_by_entity_id: Dictionary) -> CharacterAbilityResult:
 	print("Ability has been triggered on %s" % client_or_server_)
 	return CharacterAbilityResult.EMPTY_RESULT

@@ -5,17 +5,19 @@ const DEBUG_SPHERE_SCENE := preload("res://game/debug_sphere.tscn")
 const DEBUG_SPHERE_SCALE := Vector3(0.5, 0.5, 0.5)
 const DEBUG_SPHERE_LIFETIME := 5
 const TRACER_DOWNWARD_OFFSET := 0.5
+const HIT_DAMAGE := 10
 
 func perform_ability(
 		camera_transform: Transform3D,
-		remote_character_positions: Array[Vector3]) -> CharacterAbilityResult:
+		remote_character_position_by_entity_id: Dictionary) -> CharacterAbilityResult:
 	var ray_origin := camera_transform.origin
 	var ray_direction := (camera_transform.basis * Vector3.FORWARD).normalized()
 	var closest_ray_hit := RaycastUtils.compute_nearest_raycast_intersect(
-		ray_origin, ray_direction, remote_character_positions, get_world_3d().direct_space_state)
-	__draw_temporary_debug_sphere(closest_ray_hit)
+		ray_origin, ray_direction, remote_character_position_by_entity_id, get_world_3d().direct_space_state)
+	__draw_temporary_debug_sphere(closest_ray_hit.hit_point)
 	var tracer_origin := __compute_ray_tracer_origin(ray_origin, camera_transform.basis)
-	var hitscan_result := HitscanResult.new(tracer_origin, closest_ray_hit)
+	var hitscan_result := HitscanResult.new(
+		tracer_origin, closest_ray_hit.hit_point, closest_ray_hit.hit_entity_id, HIT_DAMAGE)
 	return CharacterAbilityResult.new([hitscan_result])
 
 func __draw_temporary_debug_sphere(sphere_origin: Vector3) -> void:
