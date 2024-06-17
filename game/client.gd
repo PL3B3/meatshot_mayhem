@@ -146,7 +146,9 @@ func _physics_process(_delta):
 	__draw_bullet_tracers(hitscan_ability_results)
 
 	var next_own_character_state := ClientOwnCharacterState.new(
-		next_own_character_physics_state, ability_trigger_result.next_trigger_state)
+		next_own_character_physics_state, 
+		ability_trigger_result.next_trigger_state, 
+		current_state.own_character_state().health_state())
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
 		next_own_character_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)

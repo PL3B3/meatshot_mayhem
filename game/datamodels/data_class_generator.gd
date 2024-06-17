@@ -52,15 +52,11 @@ Format is like this, but put quotes around everything. not doing b/c it's confus
 func _ready():
 	print(DataClassGenerator.generate_data_class("""
 	{
-		"name": "ClientInput",
+		"name": "CharacterHealthState",
 		"properties": [
 			{
-				"name": "input_state",
-				"type": "InputState"
-			},
-			{
-				"name": "is_triggered",
-				"type": "bool"
+				"name": "health",
+				"type": "int"
 			}
 		]
 	}

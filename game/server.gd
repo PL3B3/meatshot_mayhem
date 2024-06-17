@@ -107,7 +107,7 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 		var remote_character_state_per_entity: Dictionary = __extract_states_for_remote_characters(
 			data_to_export_per_client, client_id)
 		var client_own_character_state := ClientOwnCharacterState.new(
-			client_snapshot_data.physics_state, EMPTY_ABILITY_TRIGGER_STATE)
+			client_snapshot_data.physics_state, EMPTY_ABILITY_TRIGGER_STATE, CharacterHealthState.DEFAULT_HEALTH_STATE)
 		var state_snapshot_for_client := ServerToClientStateSnapshotMessage.new(
 			client_snapshot_data.client_tick, 
 			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
