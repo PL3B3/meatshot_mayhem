@@ -173,8 +173,9 @@ static func __extract_transform_state(
 			character_resource.input.input_state().yaw())
 
 static func __perform_character_abilities(
-		world_state: Dictionary, 
-		character_resource_per_client_id: Dictionary) -> Array[HitscanResult]:
+	world_state: Dictionary, 
+	character_resource_per_client_id: Dictionary
+) -> Array[HitscanResult]:
 	var hitscan_ability_results: Array[HitscanResult] = []
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
@@ -203,7 +204,8 @@ static func __draw_bullet_tracers(tracer_displayer: TracerDisplayer, hitscan_res
 
 static func __extract_states_for_remote_characters(
 	data_to_export_per_client: Dictionary, 
-	own_client_id: int) -> Dictionary:
+	own_client_id: int
+) -> Dictionary:
 	var states_for_remote_characters := {}
 	for client_id: int in data_to_export_per_client:
 		if client_id != own_client_id:
@@ -213,8 +215,9 @@ static func __extract_states_for_remote_characters(
 	return states_for_remote_characters
 
 static func __extract_positions_for_other_characters(
-		world_state: Dictionary, 
-		own_character_entity_id: int) -> Dictionary:
+	world_state: Dictionary, 
+	own_character_entity_id: int
+) -> Dictionary:
 	var other_character_positions_per_entity_id: Dictionary = {}
 	for character_entity_id: int in world_state:
 		if character_entity_id != own_character_entity_id:
@@ -252,7 +255,8 @@ class ServerCharacterResource:
 		client_tick_for_input: int,
 		character_entity_id: int,
 		current_physics_state: ServerCharacterState,
-		character_components: CharacterComponents) -> void:
+		character_components: CharacterComponents
+	) -> void:
 		self.input = input
 		self.client_tick_for_input = client_tick_for_input
 		self.character_entity_id = character_entity_id
@@ -271,7 +275,8 @@ class PerClientExportedData:
 		physics_state: CharacterPhysicsState,
 		health_state: CharacterHealthState,
 		transform_state: CharacterTransformState,
-		character_entity_id: int) -> void: 
+		character_entity_id: int
+	) -> void: 
 		self.client_tick = client_tick
 		self.physics_state = physics_state
 		self.health_state = health_state

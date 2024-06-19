@@ -17,7 +17,8 @@ func _init(
 	first_person_display: CharacterFirstPersonOutput, 
 	third_person_display: CharacterThirdPersonDisplay,
 	ability_trigger_state_machine: CharacterAbilityTriggerStateMachine,
-	ability_action: AbstractCharacterAbilityAction) -> void:
+	ability_action: AbstractCharacterAbilityAction
+) -> void:
 	movement_body_ = movement_body
 	first_person_display_ = first_person_display
 	third_person_display_ = third_person_display
