@@ -52,7 +52,7 @@ func _physics_process(_delta: float) -> void:
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
 	var character_resource_per_client_id := __prepare_character_resource_per_client_id(
 		client_resources_per_peer_id_, world_state_)
-	var hitscan_results := __perform_character_abilities(world_state_, character_resource_per_client_id)
+	var hitscan_results := __compute_hitscan_ability_results(world_state_, character_resource_per_client_id)
 	var next_world_state := __compute_next_state_for_characters(character_resource_per_client_id, hitscan_results)
 	var data_to_export_per_client := __compile_data_to_export_per_client(
 		character_resource_per_client_id, next_world_state)
@@ -61,6 +61,7 @@ func _physics_process(_delta: float) -> void:
 	__draw_bullet_tracers(tracer_displayer, hitscan_results)
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
+	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
 	world_state_ = next_world_state
 
@@ -70,6 +71,12 @@ func __initialize_resources_for_new_client(client_id: int) -> void:
 	var client_resources: InputBufferAndCharacterEntity = InputBufferAndCharacterEntity.new(
 		input_buffer_for_client, client_character_entity)
 	client_resources_per_peer_id_[client_id] = client_resources
+
+func __replicate_ability_trigger_on_remote_characters(character_resource_per_client_id: Dictionary) -> void:
+	for client_id: int in character_resource_per_client_id:
+		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
+		if character_resource.input.is_triggered():
+			trigger_ability_for_remote_character.rpc(character_resource.character_entity_id)
 
 func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) -> Dictionary:
 	var state_snapshots_for_clients: Dictionary = {}
@@ -172,7 +179,7 @@ static func __extract_transform_state(
 			character_resource.input.input_state().pitch(), 
 			character_resource.input.input_state().yaw())
 
-static func __perform_character_abilities(
+static func __compute_hitscan_ability_results(
 	world_state: Dictionary, 
 	character_resource_per_client_id: Dictionary
 ) -> Array[HitscanResult]:
@@ -194,7 +201,6 @@ static func __perform_character_abilities(
 			var ability_result := character_components.ability_action().perform_ability(
 				character_camera_transform, other_character_positions_during_current_tick)
 			hitscan_ability_results.append_array(ability_result.hitscan_results)
-			trigger_ability_for_remote_character.rpc(character_entity_id)
 	return hitscan_ability_results
 
 static func __draw_bullet_tracers(tracer_displayer: TracerDisplayer, hitscan_results: Array[HitscanResult]) -> void:
