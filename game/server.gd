@@ -67,6 +67,7 @@ func _physics_process(_delta: float) -> void:
 	
 	var next_world_state := {}
 	var data_to_export_per_client := {}
+	var hitscan_results := __perform_character_abilities(world_state_, character_resource_per_client_id)
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		var character_entity_id := character_resource.character_entity_id
@@ -74,12 +75,18 @@ func _physics_process(_delta: float) -> void:
 		var latest_input_state := character_resource.input.input_state()
 		var next_physics_state := character_components.movement_body().compute_next_physics_state(
 				character_resource.character_state.physics_state(), latest_input_state)
+		
+		var current_health := character_resource.character_state.health_state().health()
+		for hitscan_result: HitscanResult in hitscan_results:
+			if hitscan_result.hit_entity_id == character_entity_id:
+				current_health -= hitscan_result.damage
+		var next_health_state := CharacterHealthState.new(current_health)
+		
 		var character_transform_state := CharacterTransformState.new(
 			next_physics_state.position(), latest_input_state.pitch(), latest_input_state.yaw())
 		character_components.first_person_display().display_character_transform(character_transform_state)
 		character_components.third_person_display().display_character_transform(character_transform_state)
-
-		var next_health_state := character_resource.character_state.health_state()
+		
 		next_world_state[character_entity_id] = ServerCharacterState.new(
 			next_physics_state, next_health_state)
 		data_to_export_per_client[client_id] = PerClientExportedData.new(
@@ -89,7 +96,7 @@ func _physics_process(_delta: float) -> void:
 			character_transform_state,
 			character_entity_id)
 		
-	var hitscan_results := __perform_character_abilities(world_state_, character_resource_per_client_id)
+	
 	__draw_bullet_tracers(hitscan_results)
 
 	world_state_ = next_world_state
