@@ -167,8 +167,9 @@ func _physics_process(_delta):
 	network_messenger_.send_message_to_server(input_message_to_export.to_dict())
 
 func __perform_remote_character_abilities(
-		own_character_position: Vector3, 
-		latest_remote_character_state_per_entity_id: Dictionary) -> Array[HitscanResult]:
+	own_character_position: Vector3, 
+	latest_remote_character_state_per_entity_id: Dictionary
+) -> Array[HitscanResult]:
 	var remote_character_hitscan_ability_results: Array[HitscanResult] = []
 	for remote_character_entity_id: int in pending_remote_character_triggers_:
 		if remote_character_entity_id in latest_remote_character_state_per_entity_id:
@@ -192,9 +193,10 @@ func __perform_remote_character_abilities(
 	return remote_character_hitscan_ability_results
 
 func __extract_positions_for_characters_except_remote_character(
-		own_character_position: Vector3,
-		latest_remote_character_state_per_entity_id: Dictionary,
-		remote_character_entity_id_to_exclude: int) -> Dictionary:
+	own_character_position: Vector3,
+	latest_remote_character_state_per_entity_id: Dictionary,
+	remote_character_entity_id_to_exclude: int
+) -> Dictionary:
 	var positions_for_all_but_specified_character: Dictionary = {}
 	positions_for_all_but_specified_character[RaycastUtils.NO_ENTITY_HIT] = own_character_position
 	for remote_character_entity_id: int in latest_remote_character_state_per_entity_id:
@@ -220,7 +222,8 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 	optional_reconciliation_data: Optional,
 	predicted_player_physics_state: CharacterPhysicsState, 
 	character_movement_calculator: CharacterMovementActuator,
-	current_tick: int) -> CharacterPhysicsState:
+	current_tick: int
+) -> CharacterPhysicsState:
 	if optional_reconciliation_data.is_present():
 		var authoritative_physics_state_and_tick: ReconciliationData = optional_reconciliation_data.value()
 		var reconciliation_replay_start_tick
@@ -249,7 +252,8 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 
 func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 	predicted_state: CharacterPhysicsState, 
-	simulated_state: CharacterPhysicsState) -> CharacterPhysicsState:
+	simulated_state: CharacterPhysicsState
+) -> CharacterPhysicsState:
 	var position_error: Vector3 = simulated_state.position() - predicted_state.position()
 	var velocity_error: Vector3 = simulated_state.velocity() - predicted_state.velocity()
 	if ENABLE_LOGGING:
@@ -271,7 +275,8 @@ func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 static func __compute_next_physics_state(
 	current_physics_state: CharacterPhysicsState,
 	movement_calculator: CharacterMovementActuator,
-	player_input: InputState) -> CharacterPhysicsState:
+	player_input: InputState
+) -> CharacterPhysicsState:
 	return movement_calculator.compute_next_physics_state(current_physics_state, player_input)
 
 static func __display_own_character(
@@ -288,7 +293,8 @@ static func __display_remote_characters(remote_character_resources: Array[Remote
 static func __replay_physics_computation_using_inputs(
 	initial_player_state: CharacterPhysicsState,
 	inputs_to_replay: Array[InputState],
-	movement_calculator: CharacterMovementActuator) -> CharacterPhysicsState:
+	movement_calculator: CharacterMovementActuator
+) -> CharacterPhysicsState:
 	var simulation_state: CharacterPhysicsState = initial_player_state
 	for simulation_input in inputs_to_replay:
 		simulation_state = movement_calculator.compute_next_physics_state(simulation_state, simulation_input)

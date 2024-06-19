@@ -17,10 +17,11 @@ var latest_popped_tick_: int = -1
 var is_buffering_: bool = true
 
 func _init(
-		queue_name: String,
-		default_return_value_if_empty: Variant = NO_DEFAULT_VALUE,
-		target_size: int = 3, 
-		max_size: int = 6):
+	queue_name: String,
+	default_return_value_if_empty: Variant = NO_DEFAULT_VALUE,
+	target_size: int = 3, 
+	max_size: int = 6
+) -> void:
 	assert(target_size > 0)
 	queue_name_ = queue_name
 	queue_size_at_pop_stat_ = LogsAndMetrics.add_universal_stat("%s-size-at-pop" % queue_name, 60)
