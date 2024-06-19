@@ -84,7 +84,7 @@ func _physics_process(_delta: float) -> void:
 		
 		var character_transform_state := CharacterTransformState.new(
 			next_physics_state.position(), latest_input_state.pitch(), latest_input_state.yaw())
-		character_components.first_person_display().display_character_transform(character_transform_state)
+		character_components.first_person_display().display_character_state(character_transform_state, current_health)
 		character_components.third_person_display().display_character_transform(character_transform_state)
 		
 		next_world_state[character_entity_id] = ServerCharacterState.new(

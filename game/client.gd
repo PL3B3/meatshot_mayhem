@@ -127,7 +127,10 @@ func _physics_process(_delta):
 			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
 	
-	__display_own_character(own_character_transform_state, own_character_components.first_person_display())
+	__display_own_character(
+		latest_own_character_health_state.health(),
+		own_character_transform_state, 
+		own_character_components.first_person_display())
 	__display_remote_characters(remote_character_resources)
 	var next_own_character_physics_state: CharacterPhysicsState = __compute_next_physics_state(
 		optionally_reconciled_own_character_physics_state, 
@@ -272,9 +275,10 @@ static func __compute_next_physics_state(
 	return movement_calculator.compute_next_physics_state(current_physics_state, player_input)
 
 static func __display_own_character(
+	current_health: int,
 	character_transform: CharacterTransformState,
 	first_person_display: CharacterFirstPersonOutput) -> void:
-	first_person_display.display_character_transform(character_transform)
+	first_person_display.display_character_state(character_transform, current_health)
 
 static func __display_remote_characters(remote_character_resources: Array[RemoteCharacterResource]):
 	for remote_character_resource in remote_character_resources:

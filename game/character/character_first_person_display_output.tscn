@@ -11,17 +11,9 @@ script = ExtResource("1_3sshd")
 current = true
 fov = 90.0
 
-[node name="DebugLabels" type="Control" parent="."]
-visible = false
-layout_mode = 3
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
-
-[node name="DebugLabel0" type="Label" parent="DebugLabels"]
-layout_mode = 0
-offset_right = 92.0
-offset_bottom = 26.0
+[node name="HealthLabel" type="Label" parent="."]
+offset_right = 288.0
+offset_bottom = 69.0
 theme_override_colors/font_color = Color(0.92549, 0, 0.54902, 1)
 theme_override_font_sizes/font_size = 50
 text = "CHARACTER"
