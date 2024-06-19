@@ -89,12 +89,15 @@ func _physics_process(_delta):
 		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
 	
 	var latest_remote_character_state_per_entity_id: Dictionary
+	var latest_own_character_health_state: CharacterHealthState
 	var reconciliation_data: Optional
 	var latest_server_snapshot_item: QueueItem = __get_latest_queued_authoritative_state_snapshot()
 	if latest_server_snapshot_item.is_valid():
 		var latest_server_state_snapshot: ServerToClientStateSnapshotMessage = latest_server_snapshot_item.value()
 		latest_remote_character_state_per_entity_id = (
 			latest_server_state_snapshot.client_state_snapshot().remote_character_states())
+		latest_own_character_health_state = (
+			latest_server_state_snapshot.client_state_snapshot().own_character_state().health_state())
 		if latest_server_state_snapshot.client_tick() != Network.NO_TICK:
 			reconciliation_data = Optional.of(
 				ReconciliationData.from_server_to_client_snapshot(latest_server_state_snapshot))
@@ -102,6 +105,7 @@ func _physics_process(_delta):
 			reconciliation_data = Optional.empty()
 	else:
 		latest_remote_character_state_per_entity_id = current_state.remote_character_states()
+		latest_own_character_health_state = current_state.own_character_state().health_state()
 		reconciliation_data = Optional.empty()
 	
 	var remote_character_resources: Array[RemoteCharacterResource] = []
@@ -148,7 +152,7 @@ func _physics_process(_delta):
 	var next_own_character_state := ClientOwnCharacterState.new(
 		next_own_character_physics_state, 
 		ability_trigger_result.next_trigger_state, 
-		current_state.own_character_state().health_state())
+		latest_own_character_health_state)
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
 		next_own_character_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
