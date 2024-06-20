@@ -33,6 +33,10 @@ func get_and_record_latest_input(tick: int) -> InputState:
 	input_per_tick[tick] = player_input
 	return player_input
 
+func reset_view_angle() -> void:
+	_yaw = 0
+	_pitch = 0
+
 func get_inputs_since_tick(initial_tick) -> Array[InputState]:
 	var tick = initial_tick
 	var inputs_since_tick: Array[InputState] = []
