@@ -151,6 +151,7 @@ func _physics_process(_delta):
 	hitscan_ability_results.append_array(remote_character_hitscan_ability_results)
 	
 	__draw_bullet_tracers(hitscan_ability_results)
+	__draw_bullet_hits(hitscan_ability_results)
 
 	var next_own_character_state := ClientOwnCharacterState.new(
 		next_own_character_physics_state, 
@@ -212,6 +213,11 @@ func __draw_bullet_tracers(hitscan_results: Array[HitscanResult]) -> void:
 	for hitscan_result: HitscanResult in hitscan_results:
 		tracer_displayer.add_tracer(hitscan_result.origin, hitscan_result.hit_point)
 	tracer_displayer.display_and_update_tracers()
+
+func __draw_bullet_hits(hitscan_results: Array[HitscanResult]) -> void:
+	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
+	for hitscan_result: HitscanResult in hitscan_results:
+		debug_sphere_displayer.draw_debug_sphere(hitscan_result.hit_point)
 
 func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
 	if client_state_buffer_ == null:

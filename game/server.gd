@@ -50,6 +50,7 @@ func _on_client_connected(id: int) -> void:
 
 func _physics_process(_delta: float) -> void:
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
+	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
 	var character_resource_per_client_id := __prepare_character_resource_per_client_id(
 		client_resources_per_peer_id_, world_state_)
 	var hitscan_results := __compute_hitscan_ability_results(world_state_, character_resource_per_client_id)
@@ -59,6 +60,7 @@ func _physics_process(_delta: float) -> void:
 	
 	__display_character_states(character_resource_per_client_id, next_world_state)
 	__draw_bullet_tracers(tracer_displayer, hitscan_results)
+	__draw_bullet_hits(debug_sphere_displayer, hitscan_results)
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
@@ -207,6 +209,13 @@ static func __draw_bullet_tracers(tracer_displayer: TracerDisplayer, hitscan_res
 	for hitscan_result: HitscanResult in hitscan_results:
 		tracer_displayer.add_tracer(hitscan_result.origin, hitscan_result.hit_point)
 	tracer_displayer.display_and_update_tracers()
+
+static func __draw_bullet_hits(
+	debug_sphere_displayer: DebugSphereDisplayer, 
+	hitscan_results: Array[HitscanResult]
+) -> void:
+	for hitscan_result: HitscanResult in hitscan_results:
+		debug_sphere_displayer.draw_debug_sphere(hitscan_result.hit_point)
 
 static func __extract_states_for_remote_characters(
 	data_to_export_per_client: Dictionary, 

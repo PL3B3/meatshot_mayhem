@@ -1,7 +1,11 @@
-[gd_scene load_steps=3 format=3 uid="uid://c8jh8ru1xis61"]
+[gd_scene load_steps=5 format=3 uid="uid://c8jh8ru1xis61"]
 
 [ext_resource type="Script" path="res://game/character/character_first_person_display_output.gd" id="1_3sshd"]
 [ext_resource type="Texture2D" uid="uid://b7g6q3dcwtppr" path="res://assets/crosshair.png" id="2_edoxe"]
+[ext_resource type="Texture2D" uid="uid://dx2ex6b2855uv" path="res://assets/overhang_fence_planks.png" id="3_gaw63"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_liqop"]
+font_size = 100
 
 [node name="CharacterFirstPersonDisplayOutput" type="Node3D"]
 top_level = true
@@ -33,3 +37,26 @@ grow_vertical = 2
 scale = Vector2(0.05, 0.05)
 pivot_offset = Vector2(512, 512)
 texture = ExtResource("2_edoxe")
+
+[node name="DeathScreen" type="TextureRect" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0.282353)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_gaw63")
+stretch_mode = 1
+
+[node name="YouAreDead" type="Label" parent="DeathScreen"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "YOU ARE DEAD"
+label_settings = SubResource("LabelSettings_liqop")
+horizontal_alignment = 1
+vertical_alignment = 1
