@@ -234,8 +234,9 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 		var authoritative_physics_state_and_tick: ReconciliationData = optional_reconciliation_data.value()
 		var reconciliation_replay_start_tick
 		if authoritative_physics_state_and_tick.client_tick() < current_tick - RECONCILIATION_MAX_TICKS_REPLAYED:
-			print("Server state with tick %d is too old to replay all inputs since. Replaying last %d inputs." % [
-				authoritative_physics_state_and_tick.client_tick, RECONCILIATION_MAX_TICKS_REPLAYED])
+			__log(
+				"Server state with tick %d is too old to replay all inputs since. Replaying last %d inputs.", 
+				[authoritative_physics_state_and_tick.client_tick(), RECONCILIATION_MAX_TICKS_REPLAYED])
 			reconciliation_replay_start_tick = current_tick - RECONCILIATION_MAX_TICKS_REPLAYED
 		else:
 			reconciliation_replay_start_tick = authoritative_physics_state_and_tick.client_tick() + 1
@@ -245,13 +246,15 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 			character_movement_calculator)
 		var corrected_state = __correct_predicted_physics_state_towards_simulated_authoritative_state(
 			predicted_player_physics_state, simulated_authoritative_physics_state)
-		if ENABLE_LOGGING:
-			print("Reconciling with state %s for tick %d. inputs: %s" % [
+		__log(
+			"Reconciling with state %s for tick %d. inputs: %s", [
 				authoritative_physics_state_and_tick.physics_state(), 
 				reconciliation_replay_start_tick,
-				input_handler_.get_inputs_since_tick(reconciliation_replay_start_tick)])
-			print("Predicted state: %s.\nSimulated state: %s. Corrected state: %s" % 
-				[predicted_player_physics_state, simulated_authoritative_physics_state, corrected_state])
+				input_handler_.get_inputs_since_tick(reconciliation_replay_start_tick)
+			])
+		__log(
+			"Predicted state: %s.\nSimulated state: %s. Corrected state: %s",
+			[predicted_player_physics_state, simulated_authoritative_physics_state, corrected_state])
 		return corrected_state
 	else:
 		return predicted_player_physics_state
@@ -262,8 +265,9 @@ func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 ) -> CharacterPhysicsState:
 	var position_error: Vector3 = simulated_state.position() - predicted_state.position()
 	var velocity_error: Vector3 = simulated_state.velocity() - predicted_state.velocity()
-	if ENABLE_LOGGING:
-		print("position err: %+00.4f. velocity err: %+00.4f" % [position_error.length(), velocity_error.length()])
+	__log(
+		"position err: %+00.4f. velocity err: %+00.4f",
+		[position_error.length(), velocity_error.length()])
 	if (position_error.length() > RECONCILIATION_SNAP_IF_ABOVE 
 		or position_error.length() < RECONCILIATION_SNAP_IF_BELOW):
 		return simulated_state
@@ -277,6 +281,10 @@ func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 		var corrected_velocity = predicted_state.velocity().lerp(
 			simulated_state.velocity(), RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION)
 		return CharacterPhysicsState.new(corrected_position, corrected_velocity, simulated_state.is_grounded())
+
+func __log(format_string: String, args: Array[Variant] = []) -> void:
+	if ENABLE_LOGGING:
+		print(format_string % args)
 
 static func __compute_next_physics_state(
 	current_physics_state: CharacterPhysicsState,
