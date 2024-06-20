@@ -4,6 +4,7 @@ const EMPTY_PHYSICS_STATE = {}
 const SPAWN_POINT_RANDOM_VARIATION = 5
 const SPAWN_POINT = Vector3(0, 2.5, 0)
 const OVERWRITE_EXISTING = true
+const RESPAWN_TIME_IN_TICKS := 300
 static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
 static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> TickAwareQueue: 
 	return TickAwareQueue.new("sv_input_buf[%10d]" % x, ClientInput.new(InputState.DEFAULT, false))
@@ -25,6 +26,9 @@ func resize_window(index: int = 0)  -> void:
 
 @rpc("authority", "reliable")
 func trigger_ability_for_remote_character(remote_character_entity_id: int): pass
+
+@rpc("authority", "reliable")
+func handle_death(respawn_ticks: int) -> void: pass
 
 func _ready() -> void:
 	resize_window()
@@ -75,6 +79,7 @@ func _physics_process(_delta: float) -> void:
 			var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
 			if client_resources != null:
 				client_resources.despawn()
+				handle_death.rpc_id(client_id, RESPAWN_TIME_IN_TICKS)
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
@@ -265,10 +270,7 @@ static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: In
 	else:
 		return physics_state
 
-
 class ClientResources:
-	const RESPAWN_TIME_IN_TICKS := 300
-
 	var input_buffer: TickAwareQueue
 	var character_entity: CharacterEntity
 	var ticks_until_respawn: int

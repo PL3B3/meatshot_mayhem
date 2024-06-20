@@ -18,6 +18,7 @@ const ENABLE_LOGGING := false
 @onready var network_messenger_: NetworkMessenger = $NetworkMessenger
 @onready var debug_label_: Label = $DebugLabel
 @onready var entity_spawner_: EntitySpawner = $EntitySpawner
+@onready var death_screen_: Control = $DeathScreen
 
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_state_buffer_: RefillingQueue
@@ -33,6 +34,14 @@ func resize_window(index=0):
 @rpc("authority", "reliable")
 func trigger_ability_for_remote_character(remote_character_entity_id: int):
 	pending_remote_character_triggers_.append(remote_character_entity_id)
+
+@rpc("authority", "reliable")
+func handle_death(respawn_ticks: int) -> void:
+	print("I am despawning, back in %d" % respawn_ticks)
+	death_screen_.show()
+	get_tree().create_timer(respawn_ticks / 60).timeout.connect(func(): 
+		death_screen_.hide()
+		input_handler_.reset_view_angle())
 
 func _ready():
 	resize_window()
