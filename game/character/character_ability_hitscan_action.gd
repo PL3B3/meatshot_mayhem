@@ -1,11 +1,8 @@
 extends AbstractCharacterAbilityAction
 class_name CharacterAbilityHitscanAction
 
-const DEBUG_SPHERE_SCENE := preload("res://game/debug_sphere.tscn")
-const DEBUG_SPHERE_SCALE := Vector3(0.5, 0.5, 0.5)
-const DEBUG_SPHERE_LIFETIME := 5
 const TRACER_DOWNWARD_OFFSET := 0.5
-const HIT_DAMAGE := 10
+const HIT_DAMAGE := 100
 
 func perform_ability(
 		camera_transform: Transform3D,
@@ -14,19 +11,10 @@ func perform_ability(
 	var ray_direction := (camera_transform.basis * Vector3.FORWARD).normalized()
 	var closest_ray_hit := RaycastUtils.compute_nearest_raycast_intersect(
 		ray_origin, ray_direction, remote_character_position_by_entity_id, get_world_3d().direct_space_state)
-	__draw_temporary_debug_sphere(closest_ray_hit.hit_point)
 	var tracer_origin := __compute_ray_tracer_origin(ray_origin, camera_transform.basis)
 	var hitscan_result := HitscanResult.new(
 		tracer_origin, closest_ray_hit.hit_point, closest_ray_hit.hit_entity_id, HIT_DAMAGE)
 	return CharacterAbilityResult.new([hitscan_result])
-
-func __draw_temporary_debug_sphere(sphere_origin: Vector3) -> void:
-	var debug_sphere: MeshInstance3D = DEBUG_SPHERE_SCENE.instantiate()
-	debug_sphere.position = sphere_origin
-	debug_sphere.scale = DEBUG_SPHERE_SCALE
-	add_child(debug_sphere)
-	get_tree().create_timer(DEBUG_SPHERE_LIFETIME).timeout.connect(
-		func() -> void: debug_sphere.queue_free())
 
 static func __compute_ray_tracer_origin(ray_origin: Vector3, camera_basis: Basis) -> Vector3:
 	var camera_down_direction := (camera_basis * Vector3.DOWN).normalized()
