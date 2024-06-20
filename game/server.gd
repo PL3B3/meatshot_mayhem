@@ -35,7 +35,7 @@ func _ready() -> void:
 func _handle_client_message(client_id: int, serialized_message: Dictionary) -> void:
 	var client_message := ClientToServerInputMessage.from_dict(serialized_message)
 	if client_id in client_resources_per_peer_id_:
-		var client_resources: InputBufferAndCharacterEntity = client_resources_per_peer_id_[client_id]
+		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
 		var input_buffer_for_client: TickAwareQueue = client_resources.input_buffer
 		var client_input := client_message.client_input()
 		input_buffer_for_client.push(client_input, client_message.client_tick())
@@ -49,6 +49,10 @@ func _on_client_connected(id: int) -> void:
 	resize_window(prior_peer_count)
 
 func _physics_process(_delta: float) -> void:
+	for client_id: int in client_resources_per_peer_id_:
+		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
+		client_resources.advance_respawn_timer()
+
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
 	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
 	var character_resource_per_client_id := __prepare_character_resource_per_client_id(
@@ -57,10 +61,20 @@ func _physics_process(_delta: float) -> void:
 	var next_world_state := __compute_next_state_for_characters(character_resource_per_client_id, hitscan_results)
 	var data_to_export_per_client := __compile_data_to_export_per_client(
 		character_resource_per_client_id, next_world_state)
-	
+
 	__display_character_states(character_resource_per_client_id, next_world_state)
 	__draw_bullet_tracers(tracer_displayer, hitscan_results)
 	__draw_bullet_hits(debug_sphere_displayer, hitscan_results)
+
+	for client_id: int in character_resource_per_client_id:
+		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
+		var character_entity_id := character_resource.character_entity_id
+		var next_character_state: ServerCharacterState = next_world_state[character_entity_id]
+		if next_character_state.health_state().health() <= 0:
+			next_world_state.erase(next_character_state)
+			var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
+			if client_resources != null:
+				client_resources.despawn()
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
@@ -70,8 +84,8 @@ func _physics_process(_delta: float) -> void:
 func __initialize_resources_for_new_client(client_id: int) -> void:
 	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
 	var input_buffer_for_client: TickAwareQueue = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
-	var client_resources: InputBufferAndCharacterEntity = InputBufferAndCharacterEntity.new(
-		input_buffer_for_client, client_character_entity)
+	var client_resources: ClientResources = ClientResources.new(
+		input_buffer_for_client, client_character_entity, entity_creator_)
 	client_resources_per_peer_id_[client_id] = client_resources
 
 func __replicate_ability_trigger_on_remote_characters(character_resource_per_client_id: Dictionary) -> void:
@@ -100,21 +114,22 @@ static func __prepare_character_resource_per_client_id(
 ) -> Dictionary:
 	var character_resource_per_client_id: Dictionary = {}
 	for client_id: int in client_resources_per_peer_id:
-		var client_input_buffer_and_character: InputBufferAndCharacterEntity = client_resources_per_peer_id[client_id]
-		var latest_client_input_with_tick: QueueItem = client_input_buffer_and_character.input_buffer.pop()
-		var latest_client_input: ClientInput = latest_client_input_with_tick.value()
-		var client_tick_for_input: int = latest_client_input_with_tick.tick()
-		var character_entity_id: int = client_input_buffer_and_character.character_entity.entity_id
-		var character_state: ServerCharacterState = Utils.get_or_default(
-			server_character_state_per_entity_id, 
-			character_entity_id, 
-			client_input_buffer_and_character.character_entity.state_data)
-		character_resource_per_client_id[client_id] = ServerCharacterResource.new(
-			latest_client_input,
-			client_tick_for_input,
-			character_entity_id,
-			character_state,
-			client_input_buffer_and_character.character_entity.components)
+		var client_input_buffer_and_character: ClientResources = client_resources_per_peer_id[client_id]
+		var client_character_entity := client_input_buffer_and_character.get_or_spawn_character_entity_if_alive()
+		if client_character_entity != null:
+			var latest_client_input_with_tick: QueueItem = client_input_buffer_and_character.input_buffer.pop()
+			var latest_client_input: ClientInput = latest_client_input_with_tick.value()
+			var client_tick_for_input: int = latest_client_input_with_tick.tick()
+			var character_state: ServerCharacterState = Utils.get_or_default(
+				server_character_state_per_entity_id, 
+				client_character_entity.entity_id, 
+				client_character_entity.state_data)
+			character_resource_per_client_id[client_id] = ServerCharacterResource.new(
+				latest_client_input,
+				client_tick_for_input,
+				client_character_entity.entity_id,
+				character_state,
+				client_character_entity.components)
 	return character_resource_per_client_id
 
 static func __compute_next_state_for_characters(
@@ -250,13 +265,36 @@ static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: In
 	else:
 		return physics_state
 
-class InputBufferAndCharacterEntity:
+
+class ClientResources:
+	const RESPAWN_TIME_IN_TICKS := 300
+
 	var input_buffer: TickAwareQueue
 	var character_entity: CharacterEntity
+	var ticks_until_respawn: int
+	var entity_creator: EntityCreator
 
-	func _init(input_buffer: TickAwareQueue, character_entity: CharacterEntity) -> void:
+	func _init(input_buffer: TickAwareQueue, character_entity: CharacterEntity, entity_creator: EntityCreator) -> void:
 		self.input_buffer = input_buffer
 		self.character_entity = character_entity
+		self.entity_creator = entity_creator
+		ticks_until_respawn = 0
+	
+	func advance_respawn_timer() -> void:
+		if ticks_until_respawn > 0:
+			ticks_until_respawn -= 1
+	
+	func get_or_spawn_character_entity_if_alive() -> CharacterEntity:
+		if ticks_until_respawn == 0:
+			if character_entity == null:
+				character_entity = entity_creator.create_character_entity()
+			return character_entity
+		else:
+			return null
+	
+	func despawn() -> void:
+		ticks_until_respawn = RESPAWN_TIME_IN_TICKS
+		character_entity = null
 
 class ServerCharacterResource:
 	var input: ClientInput
