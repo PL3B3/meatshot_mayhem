@@ -1,6 +1,8 @@
 extends Object
 class_name RefillingQueue
 
+const IS_LOGGING_ENABLED := false
+
 var is_return_last_valid_: bool = false
 var target_size_: int
 var max_size_: int
@@ -37,16 +39,18 @@ func push(item):
 	items_.push_back(QueueItem.new(item, true))
 	last_valid_item_ = items_.back()
 	if items_.size() > max_size_:
-		print("Queue %s has more than %d items, discarding oldest items until size reaches %d" % [
-			queue_name_, max_size_, target_size_])
+		__log(
+			"Queue %s has more than %d items, discarding oldest items until size reaches %d",
+			[queue_name_, max_size_, target_size_])
 		while items_.size() > target_size_:
 			items_.pop_front()
 
 func pop() -> QueueItem:
 	queue_size_stat_.add_sample(items_.size())
 	if items_.is_empty():
-		print("Attempting to pop from empty queue %s. Padding with %d dummy items" % [
-			queue_name_, target_size_])
+		__log(
+			"Attempting to pop from empty queue %s. Padding with %d dummy items", 
+			[queue_name_, target_size_])
 		for i in range(target_size_):
 			items_.push_back(QueueItem.DUMMY_ITEM)
 	var front_item: QueueItem = items_.pop_front()
@@ -55,3 +59,6 @@ func pop() -> QueueItem:
 func _should_return_last_valid(front_item: QueueItem) -> bool:
 	return !front_item.is_valid() and is_return_last_valid_ and last_valid_item_ != null
 
+func __log(format_string: String, args: Array[Variant] = []) -> void:
+	if IS_LOGGING_ENABLED:
+		print(format_string % args)
