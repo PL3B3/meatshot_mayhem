@@ -10,4 +10,6 @@ func draw_debug_sphere(sphere_origin: Vector3) -> void:
 	debug_sphere.scale = DEBUG_SPHERE_SCALE
 	add_child(debug_sphere)
 	get_tree().create_timer(DEBUG_SPHERE_LIFETIME).timeout.connect(
-		func() -> void: debug_sphere.queue_free())
+		func() -> void:
+			if debug_sphere != null:
+				debug_sphere.queue_free())

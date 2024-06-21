@@ -56,6 +56,10 @@ func pop() -> QueueItem:
 	var front_item: QueueItem = items_.pop_front()
 	return last_valid_item_ if _should_return_last_valid(front_item) else front_item
 
+func clear_items() -> void:
+	items_.clear()
+	last_valid_item_ = null
+
 func _should_return_last_valid(front_item: QueueItem) -> bool:
 	return !front_item.is_valid() and is_return_last_valid_ and last_valid_item_ != null
 

@@ -41,22 +41,42 @@ func get_or_create_debug_sphere_displayer() -> DebugSphereDisplayer:
 		debug_sphere_displayer_ = debug_sphere_displayer
 	return debug_sphere_displayer_
 
+func despawn_all_entities() -> void:
+	if tracer_displayer_ != null:
+		remove_child(tracer_displayer_)
+		tracer_displayer_.queue_free()
+		tracer_displayer_ = null
+	if debug_sphere_displayer_ == null:
+		remove_child(debug_sphere_displayer_)
+		debug_sphere_displayer_.queue_free()
+		debug_sphere_displayer_ = null
+	if client_own_character_ != null:
+		remove_child(client_own_character_)
+		client_own_character_.queue_free()
+		client_own_character_ = null
+	for currently_spawned_character_entity_id: int in character_components_per_entity_id_.keys():
+		var character_to_despawn: CharacterComponents = (
+			character_components_per_entity_id_[currently_spawned_character_entity_id])
+		character_components_per_entity_id_.erase(currently_spawned_character_entity_id)
+		remove_child(character_to_despawn)
+		character_to_despawn.queue_free()
+
 func despawn_entities_not_in_client_snapshot(client_state_snapshot: ClientStateSnapshot) -> void:
-	var entity_ids_in_snapshot: Dictionary = {}
+	var entity_ids_in_snapshot: Array[int] = []
 	for remote_character_entity_id: int in client_state_snapshot.remote_character_states():
-		entity_ids_in_snapshot[remote_character_entity_id] = DUMMY_DICTIONARY_VALUE
+		entity_ids_in_snapshot.push_back(remote_character_entity_id)
 	__despawn_entities(entity_ids_in_snapshot)
 
 func despawn_entities_not_in_server_snapshot(server_state_snapshot: Dictionary) -> void:
-	var entity_ids_in_snapshot: Dictionary = {}
+	var entity_ids_in_snapshot: Array[int] = []
 	for character_entity_id: int in server_state_snapshot.keys():
-		entity_ids_in_snapshot[character_entity_id] = DUMMY_DICTIONARY_VALUE
+		entity_ids_in_snapshot.push_back(character_entity_id)
 	__despawn_entities(entity_ids_in_snapshot)
 
-func __despawn_entities(entity_ids_in_latest_snapshot_set: Dictionary) -> void:
+func __despawn_entities(entity_ids_in_latest_snapshot: Array[int]) -> void:
 	# iterate over keys because it's dangerous to remove from a map while iterating over it
 	for currently_spawned_character_entity_id: int in character_components_per_entity_id_.keys():
-		if not currently_spawned_character_entity_id in entity_ids_in_latest_snapshot_set:
+		if not currently_spawned_character_entity_id in entity_ids_in_latest_snapshot:
 			var character_to_despawn: CharacterComponents = (
 				character_components_per_entity_id_[currently_spawned_character_entity_id])
 			character_components_per_entity_id_.erase(currently_spawned_character_entity_id)
