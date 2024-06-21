@@ -28,7 +28,10 @@ func resize_window(index: int = 0)  -> void:
 func trigger_ability_for_remote_character(remote_character_entity_id: int): pass
 
 @rpc("authority", "reliable")
-func handle_death(respawn_ticks: int) -> void: pass
+func handle_death() -> void: pass
+
+@rpc("authority", "reliable")
+func handle_respawn() -> void: pass
 
 func _ready() -> void:
 	resize_window()
@@ -55,7 +58,9 @@ func _on_client_connected(id: int) -> void:
 func _physics_process(_delta: float) -> void:
 	for client_id: int in client_resources_per_peer_id_:
 		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
-		client_resources.advance_respawn_timer()
+		var is_just_respawned := client_resources.advance_respawn_timer()
+		if is_just_respawned:
+			handle_respawn.rpc_id(client_id)
 
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
 	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
@@ -79,7 +84,7 @@ func _physics_process(_delta: float) -> void:
 			var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
 			if client_resources != null:
 				client_resources.despawn()
-				handle_death.rpc_id(client_id, RESPAWN_TIME_IN_TICKS)
+				handle_death.rpc_id(client_id)
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
@@ -271,6 +276,9 @@ static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: In
 		return physics_state
 
 class ClientResources:
+	const JUST_RESPAWNED := true
+	const STILL_DEAD_OR_ALREADY_RESPAWNED := false
+
 	var input_buffer: TickAwareQueue
 	var character_entity: CharacterEntity
 	var ticks_until_respawn: int
@@ -282,9 +290,12 @@ class ClientResources:
 		self.entity_creator = entity_creator
 		ticks_until_respawn = 0
 	
-	func advance_respawn_timer() -> void:
+	func advance_respawn_timer() -> bool:
 		if ticks_until_respawn > 0:
 			ticks_until_respawn -= 1
+			if ticks_until_respawn == 0:
+				return JUST_RESPAWNED
+		return STILL_DEAD_OR_ALREADY_RESPAWNED
 	
 	func get_or_spawn_character_entity_if_alive() -> CharacterEntity:
 		if ticks_until_respawn == 0:

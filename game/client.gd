@@ -23,6 +23,8 @@ const ENABLE_LOGGING := false
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_state_buffer_: RefillingQueue
 var pending_remote_character_triggers_: Array[int] = []
+var ticks_to_keep_running_after_death_ := 0
+var is_alive_ := true
 var warmed_up = false
 
 @rpc("authority", "call_local", "reliable")
@@ -36,12 +38,19 @@ func trigger_ability_for_remote_character(remote_character_entity_id: int):
 	pending_remote_character_triggers_.append(remote_character_entity_id)
 
 @rpc("authority", "reliable")
-func handle_death(respawn_ticks: int) -> void:
-	print("I am despawning, back in %d" % respawn_ticks)
+func handle_death() -> void:
 	death_screen_.show()
-	get_tree().create_timer(respawn_ticks / 60).timeout.connect(func(): 
-		death_screen_.hide()
-		input_handler_.reset_view_angle())
+	is_alive_ = false
+	ticks_to_keep_running_after_death_ = 1
+
+@rpc("authority", "reliable")
+func handle_respawn() -> void:
+	entity_spawner_.despawn_all_entities()
+	pending_remote_character_triggers_.clear()
+	input_handler_.reset_view_angle()
+	client_state_buffer_.clear_items()
+	death_screen_.hide()
+	is_alive_ = true
 
 func _ready():
 	resize_window()
@@ -84,12 +93,18 @@ func _process(_delta):
 		else:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 
+func __should_run_game_simulation() -> bool:
+	return (
+		warmed_up and
+		client_state_timeline_.has_states() and
+		(is_alive_ or ticks_to_keep_running_after_death_ > 0))
+
 func _physics_process(_delta):
-	if !warmed_up:
-		return
-	if !client_state_timeline_.has_states():
-		print("No starting state. Will not compute game tick.")
-		return
+	if __should_run_game_simulation():
+		run_game_simulation_tick()
+	ticks_to_keep_running_after_death_ = max(0, ticks_to_keep_running_after_death_ - 1)
+
+func run_game_simulation_tick() -> void:
 	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
 	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
 	var latest_input: InputState = input_handler_.get_and_record_latest_input(client_state_timeline_.get_next_tick())
