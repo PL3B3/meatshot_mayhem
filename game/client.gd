@@ -25,6 +25,7 @@ var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_state_buffer_: RefillingQueue
 var pending_remote_character_triggers_: Array[int] = []
 var recent_client_to_server_inputs_: Array[Dictionary] = []
+var latest_reconciliation_data_: Optional = Optional.empty()
 var ticks_to_keep_running_after_death_ := 0
 var is_alive_ := true
 var warmed_up = false
@@ -76,6 +77,8 @@ func _handle_server_message(message: Dictionary):
 	client_state_buffer_.push(server_snapshot)
 	if !client_state_timeline_.has_states():
 		client_state_timeline_.add_next_state(server_snapshot.client_state_snapshot())
+	if server_snapshot.client_tick() != Network.NO_TICK:
+		latest_reconciliation_data_ = Optional.of(ReconciliationData.from_server_to_client_snapshot(server_snapshot))
 
 func _on_peer_connected(id: int):
 	print("Peer with id ", id, " connected")
@@ -116,7 +119,6 @@ func run_game_simulation_tick() -> void:
 	
 	var latest_remote_character_state_per_entity_id: Dictionary
 	var latest_own_character_health_state: CharacterHealthState
-	var reconciliation_data: Optional
 	var latest_server_snapshot_item: QueueItem = __get_latest_queued_authoritative_state_snapshot()
 	if latest_server_snapshot_item.is_valid():
 		var latest_server_state_snapshot: ServerToClientStateSnapshotMessage = latest_server_snapshot_item.value()
@@ -124,15 +126,9 @@ func run_game_simulation_tick() -> void:
 			latest_server_state_snapshot.client_state_snapshot().remote_character_states())
 		latest_own_character_health_state = (
 			latest_server_state_snapshot.client_state_snapshot().own_character_state().health_state())
-		if latest_server_state_snapshot.client_tick() != Network.NO_TICK:
-			reconciliation_data = Optional.of(
-				ReconciliationData.from_server_to_client_snapshot(latest_server_state_snapshot))
-		else:
-			reconciliation_data = Optional.empty()
 	else:
 		latest_remote_character_state_per_entity_id = current_state.remote_character_states()
 		latest_own_character_health_state = current_state.own_character_state().health_state()
-		reconciliation_data = Optional.empty()
 	
 	var remote_character_resources: Array[RemoteCharacterResource] = []
 	var remote_character_latest_position_per_entity_id: Dictionary = {}
@@ -148,7 +144,7 @@ func run_game_simulation_tick() -> void:
 
 	var optionally_reconciled_own_character_physics_state: CharacterPhysicsState = (
 		__reconcile_own_character_physics_state_with_authoritative_state(
-			reconciliation_data, 
+			latest_reconciliation_data_, 
 			own_character_physics_state, 
 			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
