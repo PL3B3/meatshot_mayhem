@@ -11,8 +11,18 @@ func add_server_stat(stat_name, interval=10, use_diff=false, display_label=null)
 func add_universal_stat(stat_name, interval=10, use_diff=false, display_label=null) -> Statistics:
 	return add_statistic(stat_name, NetworkLogMode.CLIENT_AND_SERVER, interval, use_diff)
 
-func add_statistic(stat_name, network_mode, interval=10, use_diff=false, display_label=null) -> Statistics:
-	var statistic = Statistics.new(stat_name, use_diff, network_mode, interval)
+func add_counter(stat_name, interval=10) -> Statistics:
+	return add_statistic(stat_name, NetworkLogMode.CLIENT_AND_SERVER, interval, false, null, true)
+
+func add_statistic(
+	stat_name, 
+	network_mode, 
+	interval=10, 
+	use_diff=false, 
+	display_label=null, 
+	is_counter=false
+) -> Statistics:
+	var statistic = Statistics.new(stat_name, use_diff, network_mode, interval, is_counter)
 	statistics_[stat_name] = statistic
 	add_child(statistic)
 	if display_label:
