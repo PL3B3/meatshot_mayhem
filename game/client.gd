@@ -23,6 +23,7 @@ const ENABLE_LOGGING := false
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_state_buffer_: RefillingQueue
 var pending_remote_character_triggers_: Array[int] = []
+var recent_client_to_server_inputs_: Array[Dictionary] = []
 var ticks_to_keep_running_after_death_ := 0
 var is_alive_ := true
 var warmed_up = false
@@ -189,7 +190,7 @@ func run_game_simulation_tick() -> void:
 	var input_message_to_export := ClientToServerInputMessage.new(
 		tick_for_state_computed_using_latest_input, 
 		ClientInput.new(latest_input, ability_trigger_result.is_triggered))
-	network_messenger_.send_message_to_server(input_message_to_export.to_dict())
+	__send_recent_inputs_to_server(input_message_to_export.to_dict())
 
 func __perform_remote_character_abilities(
 	own_character_position: Vector3, 
@@ -305,6 +306,15 @@ func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 		var corrected_velocity = predicted_state.velocity().lerp(
 			simulated_state.velocity(), RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION)
 		return CharacterPhysicsState.new(corrected_position, corrected_velocity, simulated_state.is_grounded())
+
+func __send_recent_inputs_to_server(latest_message: Dictionary) -> void:
+	recent_client_to_server_inputs_.push_back(latest_message)
+	while recent_client_to_server_inputs_.size() > 5:
+		recent_client_to_server_inputs_.pop_front()
+	var message := {
+		"inputs": recent_client_to_server_inputs_.duplicate(true)
+	}
+	network_messenger_.send_message_to_server(message)
 
 func __log(format_string: String, args: Array[Variant] = []) -> void:
 	if ENABLE_LOGGING:
