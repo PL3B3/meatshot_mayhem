@@ -12,7 +12,8 @@ var items_: Array[QueueItem] = []
 
 var queue_size_at_pop_stat_: Statistics
 var queue_size_at_push_stat_: Statistics
-var queue_name_
+var queue_pop_misses_: Statistics
+var queue_name_: String
 var latest_popped_tick_: int = -1
 var is_buffering_: bool = true
 
@@ -26,6 +27,7 @@ func _init(
 	queue_name_ = queue_name
 	queue_size_at_pop_stat_ = LogsAndMetrics.add_universal_stat("%s-size-at-pop" % queue_name, 60)
 	queue_size_at_push_stat_ = LogsAndMetrics.add_universal_stat("%s-size-at-push" % queue_name, 60)
+	queue_pop_misses_ = LogsAndMetrics.add_counter("%s-pop-misses" % queue_name, 60)
 	default_return_value_if_empty_ = default_return_value_if_empty
 	target_size_ = target_size
 	max_size_ = max_size
@@ -83,6 +85,7 @@ func __insert_item_in_order(item: QueueItem):
 	items_.push_back(item)
 
 func __get_default_if_configured_else_dummy():
+	queue_pop_misses_.increment_counter()
 	if default_return_value_if_empty_ == NO_DEFAULT_VALUE:
 		return QueueItem.DUMMY_ITEM
 	else:
