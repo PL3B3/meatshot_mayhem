@@ -40,12 +40,13 @@ func _ready() -> void:
 	map_spawner.spawn(null)
 
 func _handle_client_message(client_id: int, serialized_message: Dictionary) -> void:
-	var client_message := ClientToServerInputMessage.from_dict(serialized_message)
 	if client_id in client_resources_per_peer_id_:
 		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
 		var input_buffer_for_client: TickAwareQueue = client_resources.input_buffer
-		var client_input := client_message.client_input()
-		input_buffer_for_client.push(client_input, client_message.client_tick())
+		for serialized_input: Dictionary in serialized_message["inputs"]:
+			var client_message := ClientToServerInputMessage.from_dict(serialized_input)
+			var client_input := client_message.client_input()
+			input_buffer_for_client.push(client_input, client_message.client_tick())
 	else:
 		print("Cannot enqueue input serialized_message %s from client %d. No input buffer initialized." % [serialized_message, client_id])
 
