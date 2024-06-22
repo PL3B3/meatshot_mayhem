@@ -12,6 +12,7 @@ const RECONCILIATION_POSITION_CORRECTION_LINEAR_FRACTION = 0.15
 const RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION = 0.5
 const RECONCILIATION_MAX_TICKS_REPLAYED = 16
 const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
+const NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER := 4
 const ENABLE_LOGGING := false
 
 @onready var input_handler_: ClientInputHandler = $ClientInputHandler
@@ -309,7 +310,7 @@ func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 
 func __send_recent_inputs_to_server(latest_message: Dictionary) -> void:
 	recent_client_to_server_inputs_.push_back(latest_message)
-	while recent_client_to_server_inputs_.size() > 5:
+	while recent_client_to_server_inputs_.size() > 1 + NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER:
 		recent_client_to_server_inputs_.pop_front()
 	var message := {
 		"inputs": recent_client_to_server_inputs_.duplicate(true)
