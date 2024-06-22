@@ -6,8 +6,8 @@ const SPAWN_POINT = Vector3(0, 2.5, 0)
 const OVERWRITE_EXISTING = true
 const RESPAWN_TIME_IN_TICKS := 300
 static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
-static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> TickAwareQueue: 
-	return TickAwareQueue.new("sv_input_buf[%10d]" % x, ClientInput.new(InputState.DEFAULT, false))
+static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputBuffer: 
+	return OrderedInputBuffer.new("sv_input_buf[%10d]" % x)
 static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 
 @onready var messenger: NetworkMessenger = $NetworkMessenger
@@ -42,7 +42,7 @@ func _ready() -> void:
 func _handle_client_message(client_id: int, serialized_message: Dictionary) -> void:
 	if client_id in client_resources_per_peer_id_:
 		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
-		var input_buffer_for_client: TickAwareQueue = client_resources.input_buffer
+		var input_buffer_for_client: OrderedInputBuffer = client_resources.input_buffer
 		for serialized_input: Dictionary in serialized_message["inputs"]:
 			var client_message := ClientToServerInputMessage.from_dict(serialized_input)
 			var client_input := client_message.client_input()
@@ -94,7 +94,7 @@ func _physics_process(_delta: float) -> void:
 
 func __initialize_resources_for_new_client(client_id: int) -> void:
 	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
-	var input_buffer_for_client: TickAwareQueue = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
+	var input_buffer_for_client: OrderedInputBuffer = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
 	var client_resources: ClientResources = ClientResources.new(
 		input_buffer_for_client, client_character_entity, entity_creator_)
 	client_resources_per_peer_id_[client_id] = client_resources
@@ -280,12 +280,12 @@ class ClientResources:
 	const JUST_RESPAWNED := true
 	const STILL_DEAD_OR_ALREADY_RESPAWNED := false
 
-	var input_buffer: TickAwareQueue
+	var input_buffer: OrderedInputBuffer
 	var character_entity: CharacterEntity
 	var ticks_until_respawn: int
 	var entity_creator: EntityCreator
 
-	func _init(input_buffer: TickAwareQueue, character_entity: CharacterEntity, entity_creator: EntityCreator) -> void:
+	func _init(input_buffer: OrderedInputBuffer, character_entity: CharacterEntity, entity_creator: EntityCreator) -> void:
 		self.input_buffer = input_buffer
 		self.character_entity = character_entity
 		self.entity_creator = entity_creator
