@@ -26,6 +26,7 @@ var client_state_buffer_: RefillingQueue
 var pending_remote_character_triggers_: Array[int] = []
 var recent_client_to_server_inputs_: Array[Dictionary] = []
 var latest_reconciliation_data_: Optional = Optional.empty()
+var latest_authoritative_health_state: CharacterHealthState = null
 var ticks_to_keep_running_after_death_ := 0
 var is_alive_ := true
 var warmed_up = false
@@ -79,6 +80,7 @@ func _handle_server_message(message: Dictionary):
 		client_state_timeline_.add_next_state(server_snapshot.client_state_snapshot())
 	if server_snapshot.client_tick() != Network.NO_TICK:
 		latest_reconciliation_data_ = Optional.of(ReconciliationData.from_server_to_client_snapshot(server_snapshot))
+	latest_authoritative_health_state = server_snapshot.client_state_snapshot().own_character_state().health_state()
 
 func _on_peer_connected(id: int):
 	print("Peer with id ", id, " connected")
@@ -118,18 +120,20 @@ func run_game_simulation_tick() -> void:
 		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
 	
 	var latest_remote_character_state_per_entity_id: Dictionary
-	var latest_own_character_health_state: CharacterHealthState
 	var latest_server_snapshot_item: QueueItem = __get_latest_queued_authoritative_state_snapshot()
 	if latest_server_snapshot_item.is_valid():
 		var latest_server_state_snapshot: ServerToClientStateSnapshotMessage = latest_server_snapshot_item.value()
 		latest_remote_character_state_per_entity_id = (
 			latest_server_state_snapshot.client_state_snapshot().remote_character_states())
-		latest_own_character_health_state = (
-			latest_server_state_snapshot.client_state_snapshot().own_character_state().health_state())
 	else:
 		latest_remote_character_state_per_entity_id = current_state.remote_character_states()
-		latest_own_character_health_state = current_state.own_character_state().health_state()
 	
+	var latest_own_character_health_state: CharacterHealthState
+	if latest_authoritative_health_state == null:
+		latest_own_character_health_state = current_state.own_character_state().health_state()
+	else:
+		latest_own_character_health_state = latest_authoritative_health_state
+
 	var remote_character_resources: Array[RemoteCharacterResource] = []
 	var remote_character_latest_position_per_entity_id: Dictionary = {}
 	for remote_character_entity_id in latest_remote_character_state_per_entity_id:
