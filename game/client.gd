@@ -55,7 +55,7 @@ func handle_respawn() -> void:
 	entity_spawner_.despawn_all_entities()
 	pending_remote_character_triggers_.clear()
 	input_handler_.reset_view_angle()
-	client_remote_state_buffer_.clear_items()
+	client_remote_state_buffer_.reset()
 	death_screen_.hide()
 	is_alive_ = true
 
