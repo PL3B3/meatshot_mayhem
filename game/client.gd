@@ -13,6 +13,7 @@ const RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION = 0.5
 const RECONCILIATION_MAX_TICKS_REPLAYED = 24
 const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
 const NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER := 4
+const ENTITY_INTERPOLATION_LERP_SPEED := 0.5
 const NO_REMOTE_CHARACTER_STATES := {}
 const ENABLE_LOGGING := false
 
@@ -28,6 +29,7 @@ var pending_remote_character_triggers_: Array[int] = []
 var recent_client_to_server_inputs_: Array[Dictionary] = []
 var latest_reconciliation_data_: Optional = Optional.empty()
 var latest_authoritative_health_state: CharacterHealthState = null
+var latest_interpolated_remote_entity_snapshot := NO_REMOTE_CHARACTER_STATES
 var ticks_to_keep_running_after_death_ := 0
 var is_alive_ := true
 var warmed_up = false
@@ -244,7 +246,12 @@ func __draw_bullet_hits(hitscan_results: Array[HitscanResult]) -> void:
 func __get_latest_queued_authoritative_state_snapshot() -> Dictionary:
 	if client_remote_state_buffer_ == null:
 		return NO_REMOTE_CHARACTER_STATES
-	return client_remote_state_buffer_.pop()
+	var next_authoritative_snapshot := client_remote_state_buffer_.pop()
+	latest_interpolated_remote_entity_snapshot = StateInterpolationUtils.interpolate_remote_state_snapshots(
+		latest_interpolated_remote_entity_snapshot,
+		next_authoritative_snapshot,
+		ENTITY_INTERPOLATION_LERP_SPEED)
+	return latest_interpolated_remote_entity_snapshot
 
 func __reconcile_own_character_physics_state_with_authoritative_state(
 	optional_reconciliation_data: Optional,
