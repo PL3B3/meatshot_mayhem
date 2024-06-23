@@ -13,6 +13,7 @@ const RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION = 0.5
 const RECONCILIATION_MAX_TICKS_REPLAYED = 24
 const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
 const NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER := 4
+const NO_REMOTE_CHARACTER_STATES := {}
 const ENABLE_LOGGING := false
 
 @onready var input_handler_: ClientInputHandler = $ClientInputHandler
@@ -22,7 +23,7 @@ const ENABLE_LOGGING := false
 @onready var death_screen_: Control = $DeathScreen
 
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
-var client_state_buffer_: RefillingQueue
+var client_remote_state_buffer_: OrderedStateSnapshotBuffer
 var pending_remote_character_triggers_: Array[int] = []
 var recent_client_to_server_inputs_: Array[Dictionary] = []
 var latest_reconciliation_data_: Optional = Optional.empty()
@@ -52,7 +53,7 @@ func handle_respawn() -> void:
 	entity_spawner_.despawn_all_entities()
 	pending_remote_character_triggers_.clear()
 	input_handler_.reset_view_angle()
-	client_state_buffer_.clear_items()
+	client_remote_state_buffer_.clear_items()
 	death_screen_.hide()
 	is_alive_ = true
 
@@ -74,8 +75,10 @@ func start_client():
 	print("PEERS COUNT: ", multiplayer.get_peers().size())
 
 func _handle_server_message(message: Dictionary):
-	var server_snapshot := ServerToClientStateSnapshotMessage.from_dict(message)
-	client_state_buffer_.push(server_snapshot)
+	var server_snapshot_tick: int = message["tick"]
+	var server_snapshot := ServerToClientStateSnapshotMessage.from_dict(message["snapshot"])
+	var authoritative_remote_state := server_snapshot.client_state_snapshot().remote_character_states()
+	client_remote_state_buffer_.push(authoritative_remote_state, server_snapshot_tick)
 	if !client_state_timeline_.has_states():
 		client_state_timeline_.add_next_state(server_snapshot.client_state_snapshot())
 	if server_snapshot.client_tick() != Network.NO_TICK:
@@ -90,7 +93,7 @@ func _on_peer_disconnected(id: int):
 
 func _on_connected_to_server():
 	debug_label_.text = "CLIENT %d" % multiplayer.get_unique_id()
-	client_state_buffer_ = RefillingQueue.new("cl_state_buf[%10d]" % multiplayer.get_unique_id(), true)
+	client_remote_state_buffer_ = OrderedStateSnapshotBuffer.new("cl_state_buf[%10d]" % multiplayer.get_unique_id())
 
 func _process(_delta):
 	LogsAndMetrics.add_sample(TIME_BETWEEN_PROCESS_CALLS_STAT, Time.get_ticks_usec())
@@ -119,14 +122,7 @@ func run_game_simulation_tick() -> void:
 	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
 		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
 	
-	var latest_remote_character_state_per_entity_id: Dictionary
-	var latest_server_snapshot_item: QueueItem = __get_latest_queued_authoritative_state_snapshot()
-	if latest_server_snapshot_item.is_valid():
-		var latest_server_state_snapshot: ServerToClientStateSnapshotMessage = latest_server_snapshot_item.value()
-		latest_remote_character_state_per_entity_id = (
-			latest_server_state_snapshot.client_state_snapshot().remote_character_states())
-	else:
-		latest_remote_character_state_per_entity_id = current_state.remote_character_states()
+	var latest_remote_character_state_per_entity_id: Dictionary = __get_latest_queued_authoritative_state_snapshot()
 	
 	var latest_own_character_health_state: CharacterHealthState
 	if latest_authoritative_health_state == null:
@@ -245,10 +241,10 @@ func __draw_bullet_hits(hitscan_results: Array[HitscanResult]) -> void:
 	for hitscan_result: HitscanResult in hitscan_results:
 		debug_sphere_displayer.draw_debug_sphere(hitscan_result.hit_point)
 
-func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
-	if client_state_buffer_ == null:
-		return QueueItem.DUMMY_ITEM
-	return client_state_buffer_.pop()
+func __get_latest_queued_authoritative_state_snapshot() -> Dictionary:
+	if client_remote_state_buffer_ == null:
+		return NO_REMOTE_CHARACTER_STATES
+	return client_remote_state_buffer_.pop()
 
 func __reconcile_own_character_physics_state_with_authoritative_state(
 	optional_reconciliation_data: Optional,

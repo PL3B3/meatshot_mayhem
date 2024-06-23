@@ -56,6 +56,7 @@ func _on_client_connected(id: int) -> void:
 	resize_window.rpc_id(id, prior_peer_count)
 	resize_window(prior_peer_count)
 
+var tick = 0
 func _physics_process(_delta: float) -> void:
 	for client_id: int in client_resources_per_peer_id_:
 		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
@@ -91,6 +92,7 @@ func _physics_process(_delta: float) -> void:
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
 	world_state_ = next_world_state
+	tick += 1
 
 func __initialize_resources_for_new_client(client_id: int) -> void:
 	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
@@ -116,7 +118,10 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 		var state_snapshot_for_client := ServerToClientStateSnapshotMessage.new(
 			client_snapshot_data.client_tick, 
 			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
-		messenger.send_message_to_client(client_id, state_snapshot_for_client.to_dict())
+		messenger.send_message_to_client(client_id, {
+			"tick": tick,
+			"snapshot": state_snapshot_for_client.to_dict()
+		})
 	return state_snapshots_for_clients
 
 static func __prepare_character_resource_per_client_id(
