@@ -8,7 +8,6 @@ const TARGET_SIZE: int = 4
 const MAX_SIZE: int = 8
 const NO_REMOTE_CHARACTER_STATES := {}
 
-
 var queue_size_at_pop_stat_: Statistics
 var queue_size_at_push_stat_: Statistics
 var queue_name_: String
@@ -22,7 +21,7 @@ var items_: Array[QueueItem] = []
 func _init(queue_name: String) -> void:
 	queue_size_at_pop_stat_ = LogsAndMetrics.add_universal_stat("%s-size-at-pop" % queue_name, 60)
 	queue_size_at_push_stat_ = LogsAndMetrics.add_universal_stat("%s-size-at-push" % queue_name, 60)
-	queue_pop_misses_ = LogsAndMetrics.add_counter("%s-pop-misses" % queue_name, 10)
+	queue_pop_misses_ = LogsAndMetrics.add_counter("%s-pop-misses" % queue_name, 60)
 	queue_name_ = queue_name
 
 func push(remote_character_states: Dictionary, tick: int) -> void:
@@ -44,8 +43,11 @@ func pop() -> Dictionary:
 		last_valid_remote_character_states_ = next_queued_snapshot.value()
 		return next_queued_snapshot.value()
 
-func clear_items() -> void:
+func reset() -> void:
 	last_valid_remote_character_states_ = NO_REMOTE_CHARACTER_STATES
+	queue_pop_misses_.print_and_clear_stats()
+	latest_popped_tick_ = Network.NO_TICK
+	is_buffering_ = false
 	items_.clear()
 
 func __enable_buffering_if_empty() -> void:
