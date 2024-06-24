@@ -16,7 +16,9 @@ static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 @onready var entity_creator_ := EntityCreator.new(entity_spawner_)
 
 var client_resources_per_peer_id_ := {}
+var world_state_per_server_tick_ := {}
 var world_state_ := {}
+var tick_ := 0
 
 @rpc("authority", "call_local", "reliable")
 func resize_window(index: int = 0)  -> void:
@@ -56,7 +58,6 @@ func _on_client_connected(id: int) -> void:
 	resize_window.rpc_id(id, prior_peer_count)
 	resize_window(prior_peer_count)
 
-var tick = 0
 func _physics_process(_delta: float) -> void:
 	for client_id: int in client_resources_per_peer_id_:
 		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
@@ -68,7 +69,8 @@ func _physics_process(_delta: float) -> void:
 	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
 	var character_resource_per_client_id := __prepare_character_resource_per_client_id(
 		client_resources_per_peer_id_, world_state_)
-	var hitscan_results := __compute_hitscan_ability_results(world_state_, character_resource_per_client_id)
+	var hitscan_results := __compute_hitscan_ability_results(
+		world_state_, world_state_per_server_tick_, character_resource_per_client_id)
 	var next_world_state := __compute_next_state_for_characters(character_resource_per_client_id, hitscan_results)
 	var data_to_export_per_client := __compile_data_to_export_per_client(
 		character_resource_per_client_id, next_world_state)
@@ -92,7 +94,15 @@ func _physics_process(_delta: float) -> void:
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
 	world_state_ = next_world_state
-	tick += 1
+	
+	world_state_per_server_tick_[tick_] = next_world_state
+	__clear_old_world_states()
+	tick_ += 1
+
+func __clear_old_world_states() -> void:
+	for old_tick: int in world_state_per_server_tick_.keys():
+		if old_tick < tick_ - 100:
+			world_state_per_server_tick_.erase(old_tick)
 
 func __initialize_resources_for_new_client(client_id: int) -> void:
 	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
@@ -119,7 +129,7 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 			client_snapshot_data.client_tick, 
 			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
 		messenger.send_message_to_client(client_id, {
-			"tick": tick,
+			"tick": tick_,
 			"snapshot": state_snapshot_for_client.to_dict()
 		})
 	return state_snapshots_for_clients
@@ -213,7 +223,8 @@ static func __extract_transform_state(
 			character_resource.input.input_state().yaw())
 
 static func __compute_hitscan_ability_results(
-	world_state: Dictionary, 
+	current_world_state: Dictionary, 
+	world_state_per_server_tick: Dictionary,
 	character_resource_per_client_id: Dictionary
 ) -> Array[HitscanResult]:
 	var hitscan_ability_results: Array[HitscanResult] = []
@@ -227,10 +238,18 @@ static func __compute_hitscan_ability_results(
 				character_resource.character_state.physics_state().position(), 
 				latest_input_state.pitch(), 
 				latest_input_state.yaw())
+			var server_tick_client_saw_at_time_of_trigger := (
+				character_resource.input.displayed_server_tick_at_time_of_trigger())
+			var lag_compensated_world_state: Dictionary = (
+				world_state_per_server_tick[server_tick_client_saw_at_time_of_trigger])
+			if lag_compensated_world_state == null:
+				print("Cannot lag compensate hitscan ability against state with tick %d. Current tick: %d" % [
+					server_tick_client_saw_at_time_of_trigger])
+				lag_compensated_world_state = current_world_state
 			var character_camera_transform: Transform3D = (
 				character_components.first_person_display().compute_camera_transform(character_transform_state))
 			var other_character_positions_during_current_tick := (
-				__extract_positions_for_other_characters(world_state, character_entity_id))
+				__extract_positions_for_other_characters(lag_compensated_world_state, character_entity_id))
 			var ability_result := character_components.ability_action().perform_ability(
 				character_camera_transform, other_character_positions_during_current_tick)
 			hitscan_ability_results.append_array(ability_result.hitscan_results)

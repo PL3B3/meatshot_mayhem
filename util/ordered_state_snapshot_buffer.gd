@@ -31,17 +31,17 @@ func push(remote_character_states: Dictionary, tick: int) -> void:
 	__insert_item_in_order(value_wrapped_as_queue_item)
 	__fill_in_buffer_gap_with_interpolated_states(value_wrapped_as_queue_item)
 
-func pop() -> Dictionary:
+func pop() -> QueueItem:
 	queue_size_at_pop_stat_.add_sample(items_.size())
 	__enable_buffering_if_empty()
 	if __check_if_still_buffering():
 		queue_pop_misses_.increment_counter()
-		return last_valid_remote_character_states_
+		return QueueItem.new(last_valid_remote_character_states_, false, latest_popped_tick_)
 	else:
 		latest_popped_tick_ = items_[0].tick()
 		var next_queued_snapshot: QueueItem = items_.pop_front()
 		last_valid_remote_character_states_ = next_queued_snapshot.value()
-		return next_queued_snapshot.value()
+		return next_queued_snapshot
 
 func reset() -> void:
 	last_valid_remote_character_states_ = NO_REMOTE_CHARACTER_STATES

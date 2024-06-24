@@ -8,7 +8,11 @@ const STANDING_STILL_INPUT_DOES_NOT_SLOW_WALK := false
 const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
 const MAXIMUM_TIMES_TO_RETURN_LAST_VALID_INPUT := 5
 const NO_MOVE_DIRECTION := Vector2.ZERO
-static var DEFAULT_CLIENT_INPUT := ClientInput.new(InputState.DEFAULT, EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY)
+const DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT := -1
+static var DEFAULT_CLIENT_INPUT := ClientInput.new(
+	InputState.DEFAULT, 
+	EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY, 
+	DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT)
 
 var target_size_: int
 var max_size_: int
@@ -113,7 +117,9 @@ static func __create_default_input_state_with_last_known_view_angle(last_valid_i
 		STANDING_STILL_INPUT_DOES_NOT_SLOW_WALK,
 		NO_MOVE_DIRECTION)
 	return ClientInput.new(
-		input_state_standing_still_with_last_known_view_angle, EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY)
+		input_state_standing_still_with_last_known_view_angle, 
+		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY,
+		DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT)
 
 static func __copy_last_valid_client_input_without_triggers(client_input: ClientInput) -> ClientInput:
 	var input_state_to_copy := client_input.input_state()
@@ -123,7 +129,10 @@ static func __copy_last_valid_client_input_without_triggers(client_input: Client
 		DO_NOT_RETRIGGER_JUMP_IN_EXTRAPOLATED_INPUT,
 		input_state_to_copy.is_slow_walking(),
 		input_state_to_copy.direction())
-	return ClientInput.new(copied_input_without_triggers, EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY)
+	return ClientInput.new(
+		copied_input_without_triggers, 
+		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY,
+		DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT)
 
 func __log(format_string: String, args: Array[Variant] = []) -> void:
 	if IS_LOGGING_ENABLED:
