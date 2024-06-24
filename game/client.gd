@@ -124,7 +124,8 @@ func run_game_simulation_tick() -> void:
 	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
 		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
 	
-	var latest_remote_character_state_per_entity_id: Dictionary = __get_latest_queued_authoritative_state_snapshot()
+	var interpolated_remote_entity_states: QueueItem = __get_latest_queued_authoritative_state_snapshot()
+	var latest_remote_character_state_per_entity_id: Dictionary = interpolated_remote_entity_states.value()
 	
 	var latest_own_character_health_state: CharacterHealthState
 	if latest_authoritative_health_state == null:
@@ -188,7 +189,10 @@ func run_game_simulation_tick() -> void:
 	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
 	var input_message_to_export := ClientToServerInputMessage.new(
 		tick_for_state_computed_using_latest_input, 
-		ClientInput.new(latest_input, ability_trigger_result.is_triggered))
+		ClientInput.new(
+			latest_input, 
+			ability_trigger_result.is_triggered, 
+			interpolated_remote_entity_states.tick()))
 	__send_recent_inputs_to_server(input_message_to_export.to_dict())
 
 func __perform_remote_character_abilities(
@@ -243,15 +247,20 @@ func __draw_bullet_hits(hitscan_results: Array[HitscanResult]) -> void:
 	for hitscan_result: HitscanResult in hitscan_results:
 		debug_sphere_displayer.draw_debug_sphere(hitscan_result.hit_point)
 
-func __get_latest_queued_authoritative_state_snapshot() -> Dictionary:
+func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
 	if client_remote_state_buffer_ == null:
-		return NO_REMOTE_CHARACTER_STATES
-	var next_authoritative_snapshot := client_remote_state_buffer_.pop()
+		return QueueItem.new(NO_REMOTE_CHARACTER_STATES, false, -1)
+	var next_snapshot_item_in_buffer := client_remote_state_buffer_.pop()
+	var next_authoritative_snapshot: Dictionary = next_snapshot_item_in_buffer.value()
 	latest_interpolated_remote_entity_snapshot = StateInterpolationUtils.interpolate_remote_state_snapshots(
 		latest_interpolated_remote_entity_snapshot,
 		next_authoritative_snapshot,
 		ENTITY_INTERPOLATION_LERP_SPEED)
-	return latest_interpolated_remote_entity_snapshot
+	var displayed_tick_interpolation_correction_factor := (
+		(1.0 - ENTITY_INTERPOLATION_LERP_SPEED) / ENTITY_INTERPOLATION_LERP_SPEED)
+	var displayed_server_tick: int = (
+		next_snapshot_item_in_buffer.tick() - displayed_tick_interpolation_correction_factor)
+	return QueueItem.new(latest_interpolated_remote_entity_snapshot, true, displayed_server_tick)
 
 func __reconcile_own_character_physics_state_with_authoritative_state(
 	optional_reconciliation_data: Optional,
