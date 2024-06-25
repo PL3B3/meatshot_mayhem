@@ -13,6 +13,7 @@ const RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION = 0.5
 const RECONCILIATION_MAX_TICKS_REPLAYED = 24
 const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
 const NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER := 4
+const TRIGGER_TRANSFORM_IS_SAMPLED_FROM_BEGINNING_OF_SERVER_TICK := -1
 const ENTITY_INTERPOLATION_LERP_SPEED := 0.5
 const NO_REMOTE_CHARACTER_STATES := {}
 const ENABLE_LOGGING := false
@@ -25,7 +26,7 @@ const ENABLE_LOGGING := false
 
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_remote_state_buffer_: OrderedStateSnapshotBuffer
-var pending_remote_character_triggers_: Array[int] = []
+var pending_remote_character_triggers_: Array[RemoteCharacterAbilityTrigger] = []
 var recent_client_to_server_inputs_: Array[Dictionary] = []
 var latest_reconciliation_data_: Optional = Optional.empty()
 var latest_authoritative_health_state: CharacterHealthState = null
@@ -41,8 +42,16 @@ func resize_window(index=0):
 	get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
 
 @rpc("authority", "reliable")
-func trigger_ability_for_remote_character(remote_character_entity_id: int):
-	pending_remote_character_triggers_.append(remote_character_entity_id)
+func trigger_ability_for_remote_character(
+	remote_character_entity_id: int,
+	camera_transform: Transform3D, 
+	server_tick: int
+) -> void: 
+	pending_remote_character_triggers_.append(
+		RemoteCharacterAbilityTrigger.new(
+			remote_character_entity_id,
+			camera_transform,
+			server_tick))
 
 @rpc("authority", "reliable")
 func handle_death() -> void:
@@ -172,7 +181,9 @@ func run_game_simulation_tick() -> void:
 		hitscan_ability_results.append_array(ability_result.hitscan_results)
 	
 	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
-		own_character_physics_state.position(), latest_remote_character_state_per_entity_id)
+		own_character_physics_state.position(), 
+		latest_remote_character_state_per_entity_id, 
+		interpolated_remote_entity_states.tick())
 	hitscan_ability_results.append_array(remote_character_hitscan_ability_results)
 	
 	__draw_bullet_tracers(hitscan_ability_results)
@@ -197,28 +208,30 @@ func run_game_simulation_tick() -> void:
 
 func __perform_remote_character_abilities(
 	own_character_position: Vector3, 
-	latest_remote_character_state_per_entity_id: Dictionary
+	latest_remote_character_state_per_entity_id: Dictionary,
+	currently_displayed_server_tick: int
 ) -> Array[HitscanResult]:
 	var remote_character_hitscan_ability_results: Array[HitscanResult] = []
-	for remote_character_entity_id: int in pending_remote_character_triggers_:
-		if remote_character_entity_id in latest_remote_character_state_per_entity_id:
-			var remote_character_state: CharacterTransformState = (
-				latest_remote_character_state_per_entity_id[remote_character_entity_id])
+	var unhandled_pending_triggers: Array[RemoteCharacterAbilityTrigger] = []
+	for pending_ability_trigger: RemoteCharacterAbilityTrigger in pending_remote_character_triggers_:
+		var character_entity_id_for_trigger := pending_ability_trigger.remote_character_entity_id
+		if (
+			character_entity_id_for_trigger in latest_remote_character_state_per_entity_id and
+			__is_trigger_at_or_before_current_displayed_tick(
+				pending_ability_trigger.server_tick, currently_displayed_server_tick)
+		):
 			var remote_character_components: CharacterComponents = entity_spawner_.get_or_spawn_character(
-				remote_character_entity_id, CONSTANTS.NetworkEntityMode.OTHER_CLIENT)
-			var remote_character_camera_rotation_in_euler_angles := Vector3(
-				deg_to_rad(remote_character_state.pitch()), deg_to_rad(remote_character_state.yaw()), 0)
-			var remote_character_camera_transform := Transform3D(
-				Basis.from_euler(remote_character_camera_rotation_in_euler_angles),
-				remote_character_state.position() + Vector3(0, 0.75, 0))
+				character_entity_id_for_trigger, CONSTANTS.NetworkEntityMode.OTHER_CLIENT)
 			var ability_result := remote_character_components.ability_action().perform_ability(
-				remote_character_camera_transform, 
+				pending_ability_trigger.camera_transform, 
 				__extract_positions_for_characters_except_remote_character(
 					own_character_position,
 					latest_remote_character_state_per_entity_id,
-					remote_character_entity_id))
+					character_entity_id_for_trigger))
 			remote_character_hitscan_ability_results.append_array(ability_result.hitscan_results)
-	pending_remote_character_triggers_.clear()
+		else:
+			unhandled_pending_triggers.push_back(pending_ability_trigger)
+	pending_remote_character_triggers_ = unhandled_pending_triggers
 	return remote_character_hitscan_ability_results
 
 func __extract_positions_for_characters_except_remote_character(
@@ -333,6 +346,11 @@ func __log(format_string: String, args: Array[Variant] = []) -> void:
 	if ENABLE_LOGGING:
 		print(format_string % args)
 
+static func __is_trigger_at_or_before_current_displayed_tick(
+	trigger_server_tick: int, displayed_server_tick: int
+) -> bool:
+	return displayed_server_tick >= trigger_server_tick + TRIGGER_TRANSFORM_IS_SAMPLED_FROM_BEGINNING_OF_SERVER_TICK
+
 static func __compute_next_physics_state(
 	current_physics_state: CharacterPhysicsState,
 	movement_calculator: CharacterMovementActuator,
@@ -393,3 +411,17 @@ class RemoteCharacterResource:
 	
 	func third_person_display() -> CharacterThirdPersonDisplay:
 		return third_person_display_
+
+class RemoteCharacterAbilityTrigger:
+	var remote_character_entity_id: int
+	var camera_transform: Transform3D
+	var server_tick: int
+
+	func _init(
+		remote_character_entity_id: int, 
+		camera_transform: Transform3D, 
+		server_tick: int
+	) -> void:
+		self.remote_character_entity_id = remote_character_entity_id
+		self.camera_transform = camera_transform
+		self.server_tick = server_tick
