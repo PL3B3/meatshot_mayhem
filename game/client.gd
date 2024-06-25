@@ -269,7 +269,7 @@ func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
 		latest_interpolated_remote_entity_snapshot,
 		next_authoritative_snapshot,
 		ENTITY_INTERPOLATION_LERP_SPEED)
-	var displayed_tick_interpolation_correction_factor := (
+	var displayed_tick_interpolation_correction_factor := int(
 		(1.0 - ENTITY_INTERPOLATION_LERP_SPEED) / ENTITY_INTERPOLATION_LERP_SPEED)
 	var displayed_server_tick: int = (
 		next_snapshot_item_in_buffer.tick() - displayed_tick_interpolation_correction_factor)
