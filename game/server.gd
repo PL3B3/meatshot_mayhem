@@ -27,7 +27,11 @@ func resize_window(index: int = 0)  -> void:
 	get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
 
 @rpc("authority", "reliable")
-func trigger_ability_for_remote_character(remote_character_entity_id: int): pass
+func trigger_ability_for_remote_character(
+	remote_character_entity_id: int,
+	camera_transform: Transform3D, 
+	server_tick: int
+) -> void: pass
 
 @rpc("authority", "reliable")
 func handle_death() -> void: pass
@@ -116,6 +120,19 @@ func __replicate_ability_trigger_on_remote_characters(character_resource_per_cli
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		if character_resource.input.is_triggered():
 			trigger_ability_for_remote_character.rpc(character_resource.character_entity_id)
+	for client_id: int in character_resource_per_client_id:
+		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
+		if character_resource.input.is_triggered():
+			var character_components := character_resource.character_components
+			var latest_input_state := character_resource.input.input_state()
+			var character_transform_state := CharacterTransformState.new(
+				character_resource.character_state.physics_state().position(), 
+				latest_input_state.pitch(), 
+				latest_input_state.yaw())
+			var character_camera_transform: Transform3D = (
+				character_components.first_person_display().compute_camera_transform(character_transform_state))
+			trigger_ability_for_remote_character.rpc(
+				character_resource.character_entity_id, character_camera_transform, tick_)
 
 func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) -> Dictionary:
 	var state_snapshots_for_clients: Dictionary = {}
