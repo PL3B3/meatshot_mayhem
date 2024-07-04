@@ -9,10 +9,14 @@ const CLIENT_CONNECT_TIMEOUT := 5
 @onready var __server_host_button: Button = $VBoxContainer/ServerButton
 
 func _ready() -> void:
-	__client_connect_button.pressed.connect(_on_client_connect_pressed)
-	__server_host_button.pressed.connect(_on_host_server_pressed)
-	__ip_address_text_input.text_changed.connect(_on_ip_text_input_changed)
-
+	if OS.is_debug_build():
+		var is_server_successfully_started := __try_start_server()
+		if !is_server_successfully_started:
+			__try_start_client()
+	else:
+		__client_connect_button.pressed.connect(_on_client_connect_pressed)
+		__server_host_button.pressed.connect(_on_host_server_pressed)
+		__ip_address_text_input.text_changed.connect(_on_ip_text_input_changed)	
 
 func _on_ip_text_input_changed(new_ip_address_text: String) -> void:
 	if new_ip_address_text.is_valid_ip_address():
