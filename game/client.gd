@@ -69,21 +69,16 @@ func handle_respawn() -> void:
 	is_alive_ = true
 
 func _ready():
+	assert(multiplayer.get_peers().size() > 0, "Client is not connected to server.")
+	client_remote_state_buffer_ = OrderedStateSnapshotBuffer.new("cl_state_buf[%10d]" % multiplayer.get_unique_id())
+	debug_label_.text = "CLIENT %d" % multiplayer.get_unique_id()
+
 	resize_window()
-	multiplayer.connected_to_server.connect(_on_connected_to_server)
+	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	network_messenger_.received_server_message.connect(_handle_server_message)
 	get_tree().create_timer(WARMUP_TIME).timeout.connect(func(): warmed_up = true)
 	LogsAndMetrics.add_client_stat("sim_error", 1000)
 	LogsAndMetrics.add_client_stat(TIME_BETWEEN_PROCESS_CALLS_STAT, 1000, true)
-	start_client()
-
-func start_client():
-	var peer = ENetMultiplayerPeer.new()
-	var error = peer.create_client(Network.DEFAULT_SERVER_IP, Network.PORT)
-	if error: 
-		return error
-	multiplayer.multiplayer_peer = peer
-	print("PEERS COUNT: ", multiplayer.get_peers().size())
 
 func _handle_server_message(message: Dictionary):
 	var server_snapshot_tick: int = message["tick"]
@@ -102,9 +97,8 @@ func _on_peer_connected(id: int):
 func _on_peer_disconnected(id: int):
 	print("Peer with id ", id, " disconnected")
 
-func _on_connected_to_server():
-	debug_label_.text = "CLIENT %d" % multiplayer.get_unique_id()
-	client_remote_state_buffer_ = OrderedStateSnapshotBuffer.new("cl_state_buf[%10d]" % multiplayer.get_unique_id())
+func _on_server_disconnected() -> void:
+	print("Disconnected from server")
 
 func _process(_delta):
 	LogsAndMetrics.add_sample(TIME_BETWEEN_PROCESS_CALLS_STAT, Time.get_ticks_usec())
