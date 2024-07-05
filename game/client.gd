@@ -111,7 +111,7 @@ func _process(_delta):
 		__quit_to_menu()
 
 func __quit_to_menu() -> void:
-	multiplayer.multiplayer_peer.close()
+	multiplayer.multiplayer_peer.disconnect_peer(1)
 	get_tree().change_scene_to_file("res://game/main.tscn")
 
 func __should_run_game_simulation() -> bool:

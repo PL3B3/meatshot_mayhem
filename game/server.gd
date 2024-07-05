@@ -2,7 +2,7 @@ extends Node
 
 const EMPTY_PHYSICS_STATE = {}
 const SPAWN_POINT_RANDOM_VARIATION = 5
-const SPAWN_POINT = Vector3(0, 2.5, 0)
+const SPAWN_POINT = Vector3(0, -1.5, 0)
 const OVERWRITE_EXISTING = true
 const RESPAWN_TIME_IN_TICKS := 300
 static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
@@ -42,6 +42,7 @@ func handle_respawn() -> void: pass
 func _ready() -> void:
 	resize_window()
 	multiplayer.peer_connected.connect(_on_client_connected)
+	multiplayer.peer_disconnected.connect(_on_client_disconnected)
 	messenger.received_client_message.connect(_handle_client_message)
 	map_spawner.spawn(null)
 
@@ -61,6 +62,9 @@ func _on_client_connected(id: int) -> void:
 	var prior_peer_count: int = multiplayer.get_peers().size() - 1
 	resize_window.rpc_id(id, prior_peer_count)
 	resize_window(prior_peer_count)
+
+func _on_client_disconnected(id: int) -> void:
+	client_resources_per_peer_id_.erase(id)
 
 func _physics_process(_delta: float) -> void:
 	for client_id: int in client_resources_per_peer_id_:
