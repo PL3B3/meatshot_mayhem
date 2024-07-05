@@ -1,6 +1,7 @@
 extends Node
 
 const CLIENT_CONNECT_TIMEOUT := 5
+const ENABLE_TEST_MODE := false
 
 @onready var __ip_address_text_input: LineEdit = $VBoxContainer/IpAddressHBox/IpAddressTextInput
 @onready var __invalid_ip_address_label: Label = $VBoxContainer/IpAddressHBox/InvalidIpAddressLabel
@@ -9,7 +10,7 @@ const CLIENT_CONNECT_TIMEOUT := 5
 @onready var __server_host_button: Button = $VBoxContainer/ServerButton
 
 func _ready() -> void:
-	if OS.is_debug_build():
+	if ENABLE_TEST_MODE and OS.is_debug_build():
 		var is_server_successfully_started := __try_start_server()
 		if !is_server_successfully_started:
 			__try_start_client()
