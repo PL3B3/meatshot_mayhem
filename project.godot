@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 
 LogsAndMetrics="*res://util/logs_and_metrics.tscn"
 Logger="*res://addons/godot-logger/logger.gd"
+QuitHandler="*res://game/quit_handler.gd"
 
 [debug]
 
