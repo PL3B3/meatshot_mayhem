@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name ClientStateSnapshot
 
 enum CLIENT_STATE_SNAPSHOT {

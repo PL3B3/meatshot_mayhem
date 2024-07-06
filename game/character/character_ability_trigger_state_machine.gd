@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name CharacterAbilityTriggerStateMachine
 
 const MINIMUM_TICK_INTERVAL_BETWEEN_TRIGGERS: int = 30

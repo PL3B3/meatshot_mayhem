@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name OrderedStateSnapshotBuffer
 
 const FROM_SERVER := true

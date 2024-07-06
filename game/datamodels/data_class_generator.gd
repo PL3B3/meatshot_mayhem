@@ -8,7 +8,7 @@ const PROPERTIES_KEY = "properties"
 const PROPERTY_NAME_KEY = "name"
 const PROPERTY_TYPE_KEY = "type"
 const PRIVATE_PROPERTY_SUFFIX = "_"
-const CLASS_HEADER_TEMPLATE = """extends Object
+const CLASS_HEADER_TEMPLATE = """extends RefCounted
 class_name %s\n"""
 const ENUM_TEMPLATE = """enum %s {
 %s

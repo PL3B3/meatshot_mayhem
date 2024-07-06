@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name CharacterTransformState
 
 enum CHARACTER_TRANSFORM_STATE {

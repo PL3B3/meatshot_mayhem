@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name RaycastUtils
 
 const NO_ENTITY_HIT := -1

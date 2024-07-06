@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name RefillingQueue
 
 const IS_LOGGING_ENABLED := false

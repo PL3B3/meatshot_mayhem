@@ -1,4 +1,4 @@
-class_name StateInterpolationUtils extends Object
+class_name StateInterpolationUtils extends RefCounted
 
 static func interpolate_remote_state_snapshots(
 	source_remote_state_snapshot: Dictionary, 
