@@ -128,7 +128,7 @@ func _physics_process(_delta):
 func run_game_simulation_tick() -> void:
 	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
 	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
-	var latest_input: InputState = input_handler_.get_and_record_latest_input(client_state_timeline_.get_next_tick())
+	var latest_input: InputState = input_handler_.latest_input()
 	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state().physics_state()
 	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
 		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
@@ -192,7 +192,8 @@ func run_game_simulation_tick() -> void:
 	var next_own_character_state := ClientOwnCharacterState.new(
 		next_own_character_physics_state, 
 		ability_trigger_result.next_trigger_state, 
-		latest_own_character_health_state)
+		latest_own_character_health_state,
+		latest_input)
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
 		next_own_character_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
@@ -291,17 +292,16 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 			reconciliation_replay_start_tick = current_tick - RECONCILIATION_MAX_TICKS_REPLAYED
 		else:
 			reconciliation_replay_start_tick = authoritative_physics_state_and_tick.client_tick() + 1
+		var inputs_to_replay := client_state_timeline_.get_inputs_since_tick(reconciliation_replay_start_tick)
 		var simulated_authoritative_physics_state: CharacterPhysicsState = __replay_physics_computation_using_inputs(
-			authoritative_physics_state_and_tick.physics_state(),
-			input_handler_.get_inputs_since_tick(reconciliation_replay_start_tick),
-			character_movement_calculator)
+			authoritative_physics_state_and_tick.physics_state(), inputs_to_replay, character_movement_calculator)
 		var corrected_state = __correct_predicted_physics_state_towards_simulated_authoritative_state(
 			predicted_player_physics_state, simulated_authoritative_physics_state)
 		__log(
 			"Reconciling with state %s for tick %d. inputs: %s", [
 				authoritative_physics_state_and_tick.physics_state(), 
 				reconciliation_replay_start_tick,
-				input_handler_.get_inputs_since_tick(reconciliation_replay_start_tick)
+				inputs_to_replay
 			])
 		__log(
 			"Predicted state: %s.\nSimulated state: %s. Corrected state: %s",
