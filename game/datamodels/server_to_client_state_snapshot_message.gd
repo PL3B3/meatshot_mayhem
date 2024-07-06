@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name ServerToClientStateSnapshotMessage
 
 enum SERVER_TO_CLIENT_STATE_SNAPSHOT_MESSAGE {

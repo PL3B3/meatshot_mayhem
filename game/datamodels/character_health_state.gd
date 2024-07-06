@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name CharacterHealthState
 
 enum CHARACTER_HEALTH_STATE {

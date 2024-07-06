@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name ClientToServerInputMessage
 
 enum CLIENT_TO_SERVER_INPUT_MESSAGE {

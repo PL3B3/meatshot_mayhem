@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name CharacterAbilityTriggerState
 
 enum CHARACTER_ABILITY_TRIGGER_STATE {

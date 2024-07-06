@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name QueueItem
 
 const NO_TICK = -1

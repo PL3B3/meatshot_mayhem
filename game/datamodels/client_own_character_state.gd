@@ -1,4 +1,4 @@
-extends Object
+extends RefCounted
 class_name ClientOwnCharacterState
 
 enum CLIENT_OWN_CHARACTER_STATE {
