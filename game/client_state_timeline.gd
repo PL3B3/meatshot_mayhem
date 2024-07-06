@@ -24,3 +24,9 @@ func get_next_tick():
 
 func has_states():
 	return world_states_.size() > 0
+
+func get_inputs_since_tick(start_tick_inclusive: int) -> Array[InputState]:
+	var inputs_since_start_tick_inclusive: Array[InputState] = []
+	for tick in range(start_tick_inclusive, get_next_tick()):
+		inputs_since_start_tick_inclusive.append(get_state(tick).own_character_state().input_state())
+	return inputs_since_start_tick_inclusive
