@@ -1,7 +1,7 @@
 extends Node
 
 const CLIENT_CONNECT_TIMEOUT := 5
-const ENABLE_TEST_MODE := false
+const ENABLE_TEST_MODE := true
 
 @onready var __ip_address_text_input: LineEdit = $VBoxContainer/IpAddressHBox/IpAddressTextInput
 @onready var __invalid_ip_address_label: Label = $VBoxContainer/IpAddressHBox/InvalidIpAddressLabel
