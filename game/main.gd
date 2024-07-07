@@ -10,7 +10,9 @@ const ENABLE_TEST_MODE := true
 @onready var __server_host_button: Button = $VBoxContainer/ServerButton
 
 func _ready() -> void:
-	if ENABLE_TEST_MODE and OS.is_debug_build():
+	if __is_running_in_dedicated_server_mode():
+		__try_start_server()
+	elif ENABLE_TEST_MODE and OS.is_debug_build():
 		var is_server_successfully_started := __try_start_server()
 		if !is_server_successfully_started:
 			__try_start_client()
@@ -86,6 +88,9 @@ func __enable_ui_interaction() -> void:
 	__ip_address_text_input.editable = true
 	__client_connect_button.disabled = false
 	__server_host_button.disabled = false
+
+func __is_running_in_dedicated_server_mode() -> bool:
+	return DisplayServer.get_name() == "headless"
 
 class TimeoutLatch:
 	signal complete
