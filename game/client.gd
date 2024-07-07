@@ -36,10 +36,11 @@ var is_alive_ := true
 var warmed_up = false
 
 @rpc("authority", "call_local", "reliable")
-func resize_window(index=0):
-	var screen_size: Vector2 = DisplayServer.screen_get_size()
-	get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
-	get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
+func resize_window_for_debugging(index: int = 0) -> void:
+	if OS.is_debug_build():
+		var screen_size: Vector2 = DisplayServer.screen_get_size()
+		get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
+		get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
 
 @rpc("authority", "reliable")
 func trigger_ability_for_remote_character(
@@ -73,7 +74,7 @@ func _ready():
 	client_remote_state_buffer_ = OrderedStateSnapshotBuffer.new("cl_state_buf[%10d]" % multiplayer.get_unique_id())
 	debug_label_.text = "CLIENT %d" % multiplayer.get_unique_id()
 
-	resize_window()
+	resize_window_for_debugging()
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
 	network_messenger_.received_server_message.connect(_handle_server_message)
 	get_tree().create_timer(WARMUP_TIME).timeout.connect(func(): warmed_up = true)

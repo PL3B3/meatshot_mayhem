@@ -21,10 +21,11 @@ var world_state_ := {}
 var tick_ := 0
 
 @rpc("authority", "call_local", "reliable")
-func resize_window(index: int = 0)  -> void:
-	var screen_size: Vector2 = DisplayServer.screen_get_size()
-	get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
-	get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
+func resize_window_for_debugging(index: int = 0)  -> void:
+	if OS.is_debug_build():
+		var screen_size: Vector2 = DisplayServer.screen_get_size()
+		get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
+		get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
 
 @rpc("authority", "reliable")
 func trigger_ability_for_remote_character(
@@ -40,7 +41,7 @@ func handle_death() -> void: pass
 func handle_respawn() -> void: pass
 
 func _ready() -> void:
-	resize_window()
+	resize_window_for_debugging()
 	multiplayer.peer_connected.connect(_on_client_connected)
 	multiplayer.peer_disconnected.connect(_on_client_disconnected)
 	messenger.received_client_message.connect(_handle_client_message)
@@ -60,8 +61,8 @@ func _handle_client_message(client_id: int, serialized_message: Dictionary) -> v
 func _on_client_connected(id: int) -> void:
 	__initialize_resources_for_new_client(id)
 	var prior_peer_count: int = multiplayer.get_peers().size() - 1
-	resize_window.rpc_id(id, prior_peer_count)
-	resize_window(prior_peer_count)
+	resize_window_for_debugging.rpc_id(id, prior_peer_count)
+	resize_window_for_debugging(prior_peer_count)
 
 func _on_client_disconnected(id: int) -> void:
 	client_resources_per_peer_id_.erase(id)
