@@ -33,12 +33,12 @@ func send_state_snapshot_to_client(client_id: int, tick: int, snapshot: ServerTo
 func send_inputs_to_server(input_messages: Array[Dictionary]) -> void:
 	__handle_message_from_client.rpc_id(SERVER_NETWORK_ID, { "inputs": input_messages })
 
-func trigger_ability_for_remote_character(
+func trigger_remote_character_ability(
 	remote_character_entity_id: int,
 	camera_transform: Transform3D, 
 	server_tick: int
 ) -> void:
-	__trigger_ability_for_remote_character.rpc(remote_character_entity_id, camera_transform, server_tick)
+	__trigger_remote_character_ability.rpc(remote_character_entity_id, camera_transform, server_tick)
 
 func resize_server_and_client_window_for_debugging(client_id: int = 0)  -> void:
 	var prior_peer_count: int = multiplayer.get_peers().size() - 1
@@ -75,7 +75,7 @@ func __handle_respawn() -> void:
 	respawned.emit()
 
 @rpc("authority", "call_remote", "reliable")
-func __trigger_ability_for_remote_character(
+func __trigger_remote_character_ability(
 	remote_character_entity_id: int,
 	camera_transform: Transform3D, 
 	server_tick: int

@@ -93,7 +93,7 @@ func __replicate_ability_trigger_on_remote_characters(character_resource_per_cli
 				latest_input_state.yaw())
 			var character_camera_transform: Transform3D = (
 				character_components.first_person_display().compute_camera_transform(character_transform_state))
-			network_message_bus_.trigger_ability_for_remote_character(
+			network_message_bus_.trigger_remote_character_ability(
 				character_resource.character_entity_id, character_camera_transform, tick_)
 
 func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) -> Dictionary:
