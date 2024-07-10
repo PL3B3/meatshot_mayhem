@@ -17,7 +17,7 @@ signal died()
 
 func _ready() -> void:
 	name = "NetworkBus"
-	multiplayer.peer_connected.connect(func(client_id: int) -> void: client_connected.emit(client_id))
+	multiplayer.peer_connected.connect(__on_client_connected)
 	multiplayer.peer_disconnected.connect(func(client_id: int) -> void: client_disconnected.emit(client_id))
 	multiplayer.server_disconnected.connect(func() -> void: server_disconnected.emit())
 
@@ -39,11 +39,6 @@ func trigger_remote_character_ability(
 	server_tick: int
 ) -> void:
 	__trigger_remote_character_ability.rpc(remote_character_entity_id, camera_transform, server_tick)
-
-func resize_server_and_client_window_for_debugging(client_id: int = 0)  -> void:
-	var prior_peer_count: int = multiplayer.get_peers().size() - 1
-	__resize_window_for_debugging.rpc_id(client_id, prior_peer_count)
-	__resize_server_window_for_debugging(prior_peer_count)
 
 func verify_is_connected_to_server() -> void:
 	assert(multiplayer.get_peers().size() > 0, "Client is not connected to server.")
@@ -88,6 +83,13 @@ func __resize_window_for_debugging(index: int = 0) -> void:
 		var screen_size: Vector2 = DisplayServer.screen_get_size()
 		get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
 		get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
+
+func __on_client_connected(client_id: int) -> void:
+	if multiplayer.is_server():
+		var prior_peer_count: int = multiplayer.get_peers().size() - 1
+		__resize_window_for_debugging.rpc_id(client_id, prior_peer_count)
+		__resize_server_window_for_debugging(prior_peer_count)
+		client_connected.emit(client_id)
 
 func __resize_server_window_for_debugging(index: int = 0)  -> void:
 	if OS.is_debug_build():
