@@ -19,11 +19,11 @@ const NO_REMOTE_CHARACTER_STATES := {}
 const ENABLE_LOGGING := false
 
 @onready var input_handler_: ClientInputHandler = $ClientInputHandler
-@onready var network_messenger_: NetworkMessenger = $NetworkMessenger
 @onready var debug_label_: Label = $DebugLabel
 @onready var entity_spawner_: EntitySpawner = $EntitySpawner
 @onready var death_screen_: Control = $DeathScreen
 
+var network_bus_: NetworkMessageAndEventBus
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_remote_state_buffer_: OrderedStateSnapshotBuffer
 var pending_remote_character_triggers_: Array[RemoteCharacterAbilityTrigger] = []
@@ -35,73 +35,27 @@ var ticks_to_keep_running_after_death_ := 0
 var is_alive_ := true
 var warmed_up = false
 
-@rpc("authority", "call_local", "reliable")
-func resize_window_for_debugging(index: int = 0) -> void:
-	if OS.is_debug_build():
-		var screen_size: Vector2 = DisplayServer.screen_get_size()
-		get_window().size = Vector2(screen_size.x / 2.01, screen_size.y / 2)
-		get_window().position = Vector2(screen_size.x + (index * (screen_size.x * 0.5)), 0)
 
-@rpc("authority", "reliable")
-func trigger_ability_for_remote_character(
-	remote_character_entity_id: int,
-	camera_transform: Transform3D, 
-	server_tick: int
-) -> void: 
-	pending_remote_character_triggers_.append(
-		RemoteCharacterAbilityTrigger.new(
-			remote_character_entity_id,
-			camera_transform,
-			server_tick))
+func _ready() -> void:
+	network_bus_ = NetworkMessageAndEventBus.new()
+	network_bus_.received_authoritative_state_snapshot.connect(__handle_authoritative_server_state)
+	network_bus_.triggered_remote_character_ability.connect(__on_triggered_remote_character_ability)
+	network_bus_.server_disconnected.connect(__on_server_disconnected)
+	network_bus_.respawned.connect(__on_respawn)
+	network_bus_.died.connect(__on_death)
+	add_child(network_bus_)
 
-@rpc("authority", "reliable")
-func handle_death() -> void:
-	death_screen_.show()
-	is_alive_ = false
-	ticks_to_keep_running_after_death_ = 1
+	network_bus_.verify_is_connected_to_server()
 
-@rpc("authority", "reliable")
-func handle_respawn() -> void:
-	entity_spawner_.despawn_all_entities()
-	pending_remote_character_triggers_.clear()
-	input_handler_.reset_view_angle()
-	client_remote_state_buffer_.reset()
-	death_screen_.hide()
-	is_alive_ = true
+	var multiplayer_id := network_bus_.get_unique_multiplayer_id()
+	client_remote_state_buffer_ = OrderedStateSnapshotBuffer.new("cl_state_buf[%10d]" % multiplayer_id)
+	debug_label_.text = "CLIENT %d" % multiplayer_id
 
-func _ready():
-	assert(multiplayer.get_peers().size() > 0, "Client is not connected to server.")
-	client_remote_state_buffer_ = OrderedStateSnapshotBuffer.new("cl_state_buf[%10d]" % multiplayer.get_unique_id())
-	debug_label_.text = "CLIENT %d" % multiplayer.get_unique_id()
-
-	resize_window_for_debugging()
-	multiplayer.server_disconnected.connect(_on_server_disconnected)
-	network_messenger_.received_server_message.connect(_handle_server_message)
 	get_tree().create_timer(WARMUP_TIME).timeout.connect(func(): warmed_up = true)
 	LogsAndMetrics.add_client_stat("sim_error", 1000)
 	LogsAndMetrics.add_client_stat(TIME_BETWEEN_PROCESS_CALLS_STAT, 1000, true)
 
-func _handle_server_message(message: Dictionary):
-	var server_snapshot_tick: int = message["tick"]
-	var server_snapshot := ServerToClientStateSnapshotMessage.from_dict(message["snapshot"])
-	var authoritative_remote_state := server_snapshot.client_state_snapshot().remote_character_states()
-	client_remote_state_buffer_.push(authoritative_remote_state, server_snapshot_tick)
-	if !client_state_timeline_.has_states():
-		client_state_timeline_.add_next_state(server_snapshot.client_state_snapshot())
-	if server_snapshot.client_tick() != Network.NO_TICK:
-		latest_reconciliation_data_ = Optional.of(ReconciliationData.from_server_to_client_snapshot(server_snapshot))
-	latest_authoritative_health_state = server_snapshot.client_state_snapshot().own_character_state().health_state()
-
-func _on_peer_connected(id: int):
-	print("Peer with id ", id, " connected")
-
-func _on_peer_disconnected(id: int):
-	print("Peer with id ", id, " disconnected")
-
-func _on_server_disconnected() -> void:
-	print("Disconnected from server")
-
-func _process(_delta):
+func _process(_delta: float) -> void:
 	LogsAndMetrics.add_sample(TIME_BETWEEN_PROCESS_CALLS_STAT, Time.get_ticks_usec())
 	if Input.is_action_just_pressed("toggle_window_mode"):
 		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
@@ -109,24 +63,14 @@ func _process(_delta):
 		else:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	if Input.is_action_just_pressed("quit_to_menu"):
-		__quit_to_menu()
+		network_bus_.quit_to_client_menu()
 
-func __quit_to_menu() -> void:
-	multiplayer.multiplayer_peer.disconnect_peer(1)
-	get_tree().change_scene_to_file("res://game/main.tscn")
-
-func __should_run_game_simulation() -> bool:
-	return (
-		warmed_up and
-		client_state_timeline_.has_states() and
-		(is_alive_ or ticks_to_keep_running_after_death_ > 0))
-
-func _physics_process(_delta):
+func _physics_process(_delta: float) -> void:
 	if __should_run_game_simulation():
-		run_game_simulation_tick()
+		__run_game_simulation_tick()
 	ticks_to_keep_running_after_death_ = max(0, ticks_to_keep_running_after_death_ - 1)
 
-func run_game_simulation_tick() -> void:
+func __run_game_simulation_tick() -> void:
 	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
 	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
 	var latest_input: InputState = input_handler_.latest_input()
@@ -207,6 +151,12 @@ func run_game_simulation_tick() -> void:
 			ability_trigger_result.is_triggered, 
 			interpolated_remote_entity_states.tick()))
 	__send_recent_inputs_to_server(input_message_to_export.to_dict())
+
+func __should_run_game_simulation() -> bool:
+	return (
+		warmed_up and
+		client_state_timeline_.has_states() and
+		(is_alive_ or ticks_to_keep_running_after_death_ > 0))
 
 func __perform_remote_character_abilities(
 	own_character_position: Vector3, 
@@ -338,10 +288,44 @@ func __send_recent_inputs_to_server(latest_message: Dictionary) -> void:
 	recent_client_to_server_inputs_.push_back(latest_message)
 	while recent_client_to_server_inputs_.size() > 1 + NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER:
 		recent_client_to_server_inputs_.pop_front()
-	var message := {
-		"inputs": recent_client_to_server_inputs_.duplicate(true)
-	}
-	network_messenger_.send_message_to_server(message)
+	network_bus_.send_inputs_to_server(recent_client_to_server_inputs_)
+
+func __handle_authoritative_server_state(server_tick: int, state_snapshot: ServerToClientStateSnapshotMessage) -> void:
+	var authoritative_remote_state := state_snapshot.client_state_snapshot().remote_character_states()
+	client_remote_state_buffer_.push(authoritative_remote_state, server_tick)
+	if !client_state_timeline_.has_states():
+		client_state_timeline_.add_next_state(state_snapshot.client_state_snapshot())
+	if state_snapshot.client_tick() != Network.NO_TICK:
+		latest_reconciliation_data_ = Optional.of(ReconciliationData.from_server_to_client_snapshot(state_snapshot))
+	latest_authoritative_health_state = state_snapshot.client_state_snapshot().own_character_state().health_state()
+
+func __on_triggered_remote_character_ability(
+	remote_character_entity_id: int,
+	camera_transform: Transform3D, 
+	server_tick: int
+) -> void: 
+	pending_remote_character_triggers_.append(
+		RemoteCharacterAbilityTrigger.new(
+			remote_character_entity_id,
+			camera_transform,
+			server_tick))
+
+func __on_death() -> void:
+	death_screen_.show()
+	is_alive_ = false
+	ticks_to_keep_running_after_death_ = 1
+
+func __on_respawn() -> void:
+	entity_spawner_.despawn_all_entities()
+	pending_remote_character_triggers_.clear()
+	input_handler_.reset_view_angle()
+	client_remote_state_buffer_.reset()
+	death_screen_.hide()
+	is_alive_ = true
+
+func __on_server_disconnected() -> void:
+	print("Disconnected from server")
+	network_bus_.quit_to_client_menu()
 
 func __log(format_string: String, args: Array[Variant] = []) -> void:
 	if ENABLE_LOGGING:

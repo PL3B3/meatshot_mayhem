@@ -10,69 +10,30 @@ static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputB
 	return OrderedInputBuffer.new("sv_input_buf[%10d]" % x)
 static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 
-@onready var messenger: NetworkMessenger = $NetworkMessenger
 @onready var map_spawner: MultiplayerSpawner = $MapSpawner
 @onready var entity_spawner_: EntitySpawner= $EntitySpawner
 @onready var entity_creator_ := EntityCreator.new(entity_spawner_)
 
+var network_message_bus_: NetworkMessageAndEventBus
 var client_resources_per_peer_id_ := {}
 var world_state_per_server_tick_ := {}
 var world_state_ := {}
 var tick_ := 0
 
-@rpc("authority", "call_local", "reliable")
-func resize_window_for_debugging(index: int = 0)  -> void:
-	if OS.is_debug_build():
-		var screen_size: Vector2 = DisplayServer.screen_get_size()
-		get_window().size = Vector2(screen_size.x / 2, screen_size.y / 2)
-		get_window().position = Vector2(screen_size.x * 1.5, index * (screen_size.y / 2))
-
-@rpc("authority", "reliable")
-func trigger_ability_for_remote_character(
-	remote_character_entity_id: int,
-	camera_transform: Transform3D, 
-	server_tick: int
-) -> void: pass
-
-@rpc("authority", "reliable")
-func handle_death() -> void: pass
-
-@rpc("authority", "reliable")
-func handle_respawn() -> void: pass
-
 func _ready() -> void:
-	resize_window_for_debugging()
-	multiplayer.peer_connected.connect(_on_client_connected)
-	multiplayer.peer_disconnected.connect(_on_client_disconnected)
-	messenger.received_client_message.connect(_handle_client_message)
+	network_message_bus_ = NetworkMessageAndEventBus.new()
+	network_message_bus_.received_client_input.connect(__handle_client_input)
+	network_message_bus_.client_disconnected.connect(__on_client_disconnected)
+	network_message_bus_.client_connected.connect(__on_client_connected)
+	add_child(network_message_bus_)
 	map_spawner.spawn(null)
-
-func _handle_client_message(client_id: int, serialized_message: Dictionary) -> void:
-	if client_id in client_resources_per_peer_id_:
-		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
-		var input_buffer_for_client: OrderedInputBuffer = client_resources.input_buffer
-		for serialized_input: Dictionary in serialized_message["inputs"]:
-			var client_message := ClientToServerInputMessage.from_dict(serialized_input)
-			var client_input := client_message.client_input()
-			input_buffer_for_client.push(client_input, client_message.client_tick())
-	else:
-		print("Cannot enqueue input serialized_message %s from client %d. No input buffer initialized." % [serialized_message, client_id])
-
-func _on_client_connected(id: int) -> void:
-	__initialize_resources_for_new_client(id)
-	var prior_peer_count: int = multiplayer.get_peers().size() - 1
-	resize_window_for_debugging.rpc_id(id, prior_peer_count)
-	resize_window_for_debugging(prior_peer_count)
-
-func _on_client_disconnected(id: int) -> void:
-	client_resources_per_peer_id_.erase(id)
 
 func _physics_process(_delta: float) -> void:
 	for client_id: int in client_resources_per_peer_id_:
 		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
 		var is_just_respawned := client_resources.advance_respawn_timer()
 		if is_just_respawned:
-			handle_respawn.rpc_id(client_id)
+			network_message_bus_.notify_client_of_respawn(client_id)
 
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
 	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
@@ -97,7 +58,7 @@ func _physics_process(_delta: float) -> void:
 			var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
 			if client_resources != null:
 				client_resources.despawn()
-				handle_death.rpc_id(client_id)
+				network_message_bus_.notify_client_of_death(client_id)
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
@@ -124,10 +85,6 @@ func __replicate_ability_trigger_on_remote_characters(character_resource_per_cli
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		if character_resource.input.is_triggered():
-			trigger_ability_for_remote_character.rpc(character_resource.character_entity_id)
-	for client_id: int in character_resource_per_client_id:
-		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
-		if character_resource.input.is_triggered():
 			var character_components := character_resource.character_components
 			var latest_input_state := character_resource.input.input_state()
 			var character_transform_state := CharacterTransformState.new(
@@ -136,7 +93,7 @@ func __replicate_ability_trigger_on_remote_characters(character_resource_per_cli
 				latest_input_state.yaw())
 			var character_camera_transform: Transform3D = (
 				character_components.first_person_display().compute_camera_transform(character_transform_state))
-			trigger_ability_for_remote_character.rpc(
+			network_message_bus_.trigger_ability_for_remote_character(
 				character_resource.character_entity_id, character_camera_transform, tick_)
 
 func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) -> Dictionary:
@@ -153,11 +110,23 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 		var state_snapshot_for_client := ServerToClientStateSnapshotMessage.new(
 			client_snapshot_data.client_tick, 
 			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
-		messenger.send_message_to_client(client_id, {
-			"tick": tick_,
-			"snapshot": state_snapshot_for_client.to_dict()
-		})
+		network_message_bus_.send_state_snapshot_to_client(client_id, tick_, state_snapshot_for_client)
 	return state_snapshots_for_clients
+
+func __handle_client_input(client_id: int, input: ClientToServerInputMessage) -> void:
+	if client_id in client_resources_per_peer_id_:
+		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
+		var input_buffer_for_client: OrderedInputBuffer = client_resources.input_buffer
+		input_buffer_for_client.push(input.client_input(), input.client_tick())
+	else:
+		print("Cannot enqueue input %s from client %d. No input buffer initialized." % [input, client_id])
+
+func __on_client_connected(id: int) -> void:
+	__initialize_resources_for_new_client(id)
+	network_message_bus_.resize_server_and_client_window_for_debugging(id)
+
+func __on_client_disconnected(id: int) -> void:
+	client_resources_per_peer_id_.erase(id)
 
 static func __prepare_character_resource_per_client_id(
 	client_resources_per_peer_id: Dictionary,
