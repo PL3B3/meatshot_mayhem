@@ -123,7 +123,6 @@ func __handle_client_input(client_id: int, input: ClientToServerInputMessage) ->
 
 func __on_client_connected(id: int) -> void:
 	__initialize_resources_for_new_client(id)
-	network_message_bus_.resize_server_and_client_window_for_debugging(id)
 
 func __on_client_disconnected(id: int) -> void:
 	client_resources_per_peer_id_.erase(id)
