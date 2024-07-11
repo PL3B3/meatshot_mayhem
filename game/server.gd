@@ -6,39 +6,37 @@ const SPAWN_POINT = Vector3(0, -1.5, 0)
 const OVERWRITE_EXISTING = true
 const RESPAWN_TIME_IN_TICKS := 300
 static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
-static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputBuffer: 
-	return OrderedInputBuffer.new("sv_input_buf[%10d]" % x)
 static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 
 @onready var map_spawner: MultiplayerSpawner = $MapSpawner
 @onready var entity_spawner_: EntitySpawner= $EntitySpawner
 @onready var entity_creator_ := EntityCreator.new(entity_spawner_)
+@onready var client_session_dispatcher_ := ActiveClientSessions.new(entity_creator_)
 
 var network_message_bus_: NetworkMessageAndEventBus
-var client_resources_per_peer_id_ := {}
 var world_state_per_server_tick_ := {}
 var world_state_ := {}
 var tick_ := 0
 
 func _ready() -> void:
 	network_message_bus_ = NetworkMessageAndEventBus.new()
-	network_message_bus_.received_client_input.connect(__handle_client_input)
-	network_message_bus_.client_disconnected.connect(__on_client_disconnected)
-	network_message_bus_.client_connected.connect(__on_client_connected)
+	network_message_bus_.received_client_input.connect(client_session_dispatcher_.dispatch_input_message)
+	network_message_bus_.client_disconnected.connect(client_session_dispatcher_.remove_client_session)
+	network_message_bus_.client_connected.connect(client_session_dispatcher_.add_new_client_session)
 	add_child(network_message_bus_)
 	map_spawner.spawn(null)
 
 func _physics_process(_delta: float) -> void:
-	for client_id: int in client_resources_per_peer_id_:
-		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
-		var is_just_respawned := client_resources.advance_respawn_timer()
-		if is_just_respawned:
-			network_message_bus_.notify_client_of_respawn(client_id)
+	for newly_respawned_client_id: int in (
+		client_session_dispatcher_.advance_respawn_timers_and_return_newly_respawned_client_ids()
+	):
+		network_message_bus_.notify_client_of_respawn(newly_respawned_client_id)
 
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
 	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
+	var active_client_sessions := client_session_dispatcher_.get_active_client_sessions()
 	var character_resource_per_client_id := __prepare_character_resource_per_client_id(
-		client_resources_per_peer_id_, world_state_)
+		active_client_sessions, world_state_)
 	var hitscan_results := __compute_hitscan_ability_results(
 		world_state_, world_state_per_server_tick_, character_resource_per_client_id)
 	var next_world_state := __compute_next_state_for_characters(character_resource_per_client_id, hitscan_results)
@@ -55,10 +53,8 @@ func _physics_process(_delta: float) -> void:
 		var next_character_state: ServerCharacterState = next_world_state[character_entity_id]
 		if next_character_state.health_state().health() <= 0:
 			next_world_state.erase(next_character_state)
-			var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
-			if client_resources != null:
-				client_resources.despawn()
-				network_message_bus_.notify_client_of_death(client_id)
+			client_session_dispatcher_.despawn_client_character(client_id)
+			network_message_bus_.notify_client_of_death(client_id)
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
 	__replicate_ability_trigger_on_remote_characters(character_resource_per_client_id)
@@ -73,13 +69,6 @@ func __clear_old_world_states() -> void:
 	for old_tick: int in world_state_per_server_tick_.keys():
 		if old_tick < tick_ - 100:
 			world_state_per_server_tick_.erase(old_tick)
-
-func __initialize_resources_for_new_client(client_id: int) -> void:
-	var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
-	var input_buffer_for_client: OrderedInputBuffer = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
-	var client_resources: ClientResources = ClientResources.new(
-		input_buffer_for_client, client_character_entity, entity_creator_)
-	client_resources_per_peer_id_[client_id] = client_resources
 
 func __replicate_ability_trigger_on_remote_characters(character_resource_per_client_id: Dictionary) -> void:
 	for client_id: int in character_resource_per_client_id:
@@ -112,20 +101,6 @@ func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) 
 			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
 		network_message_bus_.send_state_snapshot_to_client(client_id, tick_, state_snapshot_for_client)
 	return state_snapshots_for_clients
-
-func __handle_client_input(client_id: int, input: ClientToServerInputMessage) -> void:
-	if client_id in client_resources_per_peer_id_:
-		var client_resources: ClientResources = client_resources_per_peer_id_[client_id]
-		var input_buffer_for_client: OrderedInputBuffer = client_resources.input_buffer
-		input_buffer_for_client.push(input.client_input(), input.client_tick())
-	else:
-		print("Cannot enqueue input %s from client %d. No input buffer initialized." % [input, client_id])
-
-func __on_client_connected(id: int) -> void:
-	__initialize_resources_for_new_client(id)
-
-func __on_client_disconnected(id: int) -> void:
-	client_resources_per_peer_id_.erase(id)
 
 static func __prepare_character_resource_per_client_id(
 	client_resources_per_peer_id: Dictionary,
@@ -292,6 +267,50 @@ static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: In
 			physics_state.is_grounded())
 	else:
 		return physics_state
+
+class ActiveClientSessions:
+	static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputBuffer: 
+		return OrderedInputBuffer.new("sv_input_buf[%10d]" % x)
+	
+	var active_session_per_client_id_ := {}
+	var entity_creator_: EntityCreator
+
+	func _init(entity_creator: EntityCreator) -> void:
+		entity_creator_ = entity_creator
+
+	func add_new_client_session(client_id: int) -> void:
+		var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
+		var input_buffer_for_client: OrderedInputBuffer = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
+		var client_resources: ClientResources = ClientResources.new(
+			input_buffer_for_client, client_character_entity, entity_creator_)
+		active_session_per_client_id_[client_id] = client_resources
+
+	func remove_client_session(client_id: int) -> void:
+		active_session_per_client_id_.erase(client_id)
+
+	func dispatch_input_message(client_id: int, input: ClientToServerInputMessage) -> void:
+		if client_id in active_session_per_client_id_:
+			var client_resources: ClientResources = active_session_per_client_id_[client_id]
+			var input_buffer_for_client: OrderedInputBuffer = client_resources.input_buffer
+			input_buffer_for_client.push(input.client_input(), input.client_tick())
+		else:
+			print("Cannot enqueue input %s from client %d. No input buffer initialized." % [input, client_id])
+	
+	func get_active_client_sessions() -> Dictionary:
+		return active_session_per_client_id_.duplicate(true)
+
+	func advance_respawn_timers_and_return_newly_respawned_client_ids() -> Array[int]: 
+		var newly_respawned_client_ids: Array[int] = []
+		for client_id: int in active_session_per_client_id_:
+			var client_resources: ClientResources = active_session_per_client_id_[client_id]
+			if client_resources.advance_respawn_timer():
+				newly_respawned_client_ids.push_back(client_id)
+		return newly_respawned_client_ids
+	
+	func despawn_client_character(client_id: int) -> void:
+		if client_id in active_session_per_client_id_:
+			var client_resources: ClientResources = active_session_per_client_id_[client_id]
+			client_resources.despawn()
 
 class ClientResources:
 	const JUST_RESPAWNED := true
