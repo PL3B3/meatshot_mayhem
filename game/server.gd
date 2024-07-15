@@ -51,7 +51,7 @@ func _physics_process(_delta: float) -> void:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
 		var character_entity_id := character_resource.character_entity_id
 		var next_character_state: ServerCharacterState = next_world_state[character_entity_id]
-		if next_character_state.health_state().health() <= 0:
+		if next_character_state.health_state.health() <= 0:
 			next_world_state.erase(next_character_state)
 			client_session_dispatcher_.despawn_client_character(client_id)
 			network_message_bus_.notify_client_of_death(client_id)
@@ -77,7 +77,7 @@ func __replicate_ability_trigger_on_remote_characters(character_resource_per_cli
 			var character_components := character_resource.character_components
 			var latest_input_state := character_resource.input.input_state()
 			var character_transform_state := CharacterTransformState.new(
-				character_resource.character_state.physics_state().position(), 
+				character_resource.character_state.physics_state.position(), 
 				latest_input_state.pitch(), 
 				latest_input_state.yaw())
 			var character_camera_transform: Transform3D = (
@@ -137,9 +137,9 @@ static func __compute_next_state_for_characters(
 		var character_components := character_resource.character_components
 		var latest_input_state := character_resource.input.input_state()
 		var next_physics_state := character_components.movement_body().compute_next_physics_state(
-				character_resource.character_state.physics_state(), latest_input_state)
+				character_resource.character_state.physics_state, latest_input_state)
 		
-		var current_health := character_resource.character_state.health_state().health()
+		var current_health := character_resource.character_state.health_state.health()
 		for hitscan_result: HitscanResult in hitscan_results:
 			if hitscan_result.hit_entity_id == character_entity_id:
 				current_health -= hitscan_result.damage
@@ -161,7 +161,7 @@ static func __display_character_states(
 		var character_transform_state := __extract_transform_state(character_resource, next_character_state)
 		character_components.third_person_display().display_character_transform(character_transform_state)
 		character_components.first_person_display().display_character_state(
-			character_transform_state, next_character_state.health_state().health())
+			character_transform_state, next_character_state.health_state.health())
 
 static func __compile_data_to_export_per_client(
 	character_resource_per_client_id: Dictionary,
@@ -175,8 +175,8 @@ static func __compile_data_to_export_per_client(
 		var next_transform_state := __extract_transform_state(character_resource, next_character_state)
 		data_to_export_per_client[client_id] = PerClientExportedData.new(
 			character_resource.client_tick_for_input,
-			next_character_state.physics_state(),
-			next_character_state.health_state(),
+			next_character_state.physics_state,
+			next_character_state.health_state,
 			next_transform_state,
 			character_entity_id)
 	return data_to_export_per_client
@@ -186,7 +186,7 @@ static func __extract_transform_state(
 	character_state: ServerCharacterState
 ) -> CharacterTransformState:
 	return CharacterTransformState.new(
-			character_state.physics_state().position(), 
+			character_state.physics_state.position(), 
 			character_resource.input.input_state().pitch(), 
 			character_resource.input.input_state().yaw())
 
@@ -203,7 +203,7 @@ static func __compute_hitscan_ability_results(
 			var character_components := character_resource.character_components
 			var latest_input_state := character_resource.input.input_state()
 			var character_transform_state := CharacterTransformState.new(
-				character_resource.character_state.physics_state().position(), 
+				character_resource.character_state.physics_state.position(), 
 				latest_input_state.pitch(), 
 				latest_input_state.yaw())
 			var server_tick_client_saw_at_time_of_trigger := (
@@ -256,7 +256,7 @@ static func __extract_positions_for_other_characters(
 		if character_entity_id != own_character_entity_id:
 			var other_character_state: ServerCharacterState = world_state[character_entity_id]
 			other_character_positions_per_entity_id[character_entity_id] = (
-				other_character_state.physics_state().position())
+				other_character_state.physics_state.position())
 	return other_character_positions_per_entity_id
 
 static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: InputState) -> CharacterPhysicsState:
