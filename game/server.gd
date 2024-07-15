@@ -49,7 +49,7 @@ func _physics_process(_delta: float) -> void:
 
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
-		var character_entity_id := character_resource.character_entity_id
+		var character_entity_id := character_resource.character_state.character_entity_id
 		var next_character_state: ServerCharacterState = next_world_state[character_entity_id]
 		if next_character_state.health_state.health() <= 0:
 			next_world_state.erase(next_character_state)
@@ -73,9 +73,9 @@ func __clear_old_world_states() -> void:
 func __replicate_ability_trigger_on_remote_characters(character_resource_per_client_id: Dictionary) -> void:
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
-		if character_resource.input.is_triggered():
+		if character_resource.character_state.input.is_triggered():
 			var character_components := character_resource.character_components
-			var latest_input_state := character_resource.input.input_state()
+			var latest_input_state := character_resource.character_state.input.input_state()
 			var character_transform_state := CharacterTransformState.new(
 				character_resource.character_state.physics_state.position(), 
 				latest_input_state.pitch(), 
@@ -83,7 +83,7 @@ func __replicate_ability_trigger_on_remote_characters(character_resource_per_cli
 			var character_camera_transform: Transform3D = (
 				character_components.first_person_display().compute_camera_transform(character_transform_state))
 			network_message_bus_.trigger_remote_character_ability(
-				character_resource.character_entity_id, character_camera_transform, tick_)
+				character_resource.character_state.character_entity_id, character_camera_transform, tick_)
 
 func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) -> Dictionary:
 	var state_snapshots_for_clients: Dictionary = {}
@@ -112,17 +112,13 @@ static func __prepare_character_resource_per_client_id(
 		var client_character_entity := client_input_buffer_and_character.get_or_spawn_character_entity_if_alive()
 		if client_character_entity != null:
 			var latest_client_input_with_tick: QueueItem = client_input_buffer_and_character.input_buffer.pop()
-			var latest_client_input: ClientInput = latest_client_input_with_tick.value()
-			var client_tick_for_input: int = latest_client_input_with_tick.tick()
 			var character_state: ServerCharacterState = Utils.get_or_default(
 				server_character_state_per_entity_id, 
 				client_character_entity.entity_id, 
 				client_character_entity.state_data)
+			var character_state_updated_with_input := character_state.with_input(latest_client_input_with_tick)
 			character_resource_per_client_id[client_id] = ServerCharacterResource.new(
-				latest_client_input,
-				client_tick_for_input,
-				client_character_entity.entity_id,
-				character_state,
+				character_state_updated_with_input,
 				client_character_entity.components)
 	return character_resource_per_client_id
 
@@ -133,9 +129,9 @@ static func __compute_next_state_for_characters(
 	var next_world_state := {}
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
-		var character_entity_id := character_resource.character_entity_id
+		var character_entity_id := character_resource.character_state.character_entity_id
 		var character_components := character_resource.character_components
-		var latest_input_state := character_resource.input.input_state()
+		var latest_input_state := character_resource.character_state.input.input_state()
 		var next_physics_state := character_components.movement_body().compute_next_physics_state(
 				character_resource.character_state.physics_state, latest_input_state)
 		
@@ -145,7 +141,7 @@ static func __compute_next_state_for_characters(
 				current_health -= hitscan_result.damage
 		var next_health_state := CharacterHealthState.new(current_health)
 		
-		next_world_state[character_entity_id] = ServerCharacterState.new(
+		next_world_state[character_entity_id] = character_resource.character_state.with_physics_and_health_state(
 			next_physics_state, next_health_state)
 	return next_world_state
 
@@ -155,7 +151,7 @@ static func __display_character_states(
 ) -> void:
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
-		var character_entity_id := character_resource.character_entity_id
+		var character_entity_id := character_resource.character_state.character_entity_id
 		var next_character_state: ServerCharacterState = next_character_state_per_entity_id[character_entity_id]
 		var character_components := character_resource.character_components
 		var character_transform_state := __extract_transform_state(character_resource, next_character_state)
@@ -170,11 +166,11 @@ static func __compile_data_to_export_per_client(
 	var data_to_export_per_client := {}
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
-		var character_entity_id := character_resource.character_entity_id
+		var character_entity_id := character_resource.character_state.character_entity_id
 		var next_character_state: ServerCharacterState = next_character_state_per_entity_id[character_entity_id]
 		var next_transform_state := __extract_transform_state(character_resource, next_character_state)
 		data_to_export_per_client[client_id] = PerClientExportedData.new(
-			character_resource.client_tick_for_input,
+			character_resource.character_state.client_tick_for_input,
 			next_character_state.physics_state,
 			next_character_state.health_state,
 			next_transform_state,
@@ -187,8 +183,8 @@ static func __extract_transform_state(
 ) -> CharacterTransformState:
 	return CharacterTransformState.new(
 			character_state.physics_state.position(), 
-			character_resource.input.input_state().pitch(), 
-			character_resource.input.input_state().yaw())
+			character_resource.character_state.input.input_state().pitch(), 
+			character_resource.character_state.input.input_state().yaw())
 
 static func __compute_hitscan_ability_results(
 	current_world_state: Dictionary, 
@@ -198,16 +194,16 @@ static func __compute_hitscan_ability_results(
 	var hitscan_ability_results: Array[HitscanResult] = []
 	for client_id: int in character_resource_per_client_id:
 		var character_resource: ServerCharacterResource = character_resource_per_client_id[client_id]
-		if character_resource.input.is_triggered():
-			var character_entity_id := character_resource.character_entity_id
+		if character_resource.character_state.input.is_triggered():
+			var character_entity_id := character_resource.character_state.character_entity_id
 			var character_components := character_resource.character_components
-			var latest_input_state := character_resource.input.input_state()
+			var latest_input_state := character_resource.character_state.input.input_state()
 			var character_transform_state := CharacterTransformState.new(
 				character_resource.character_state.physics_state.position(), 
 				latest_input_state.pitch(), 
 				latest_input_state.yaw())
 			var server_tick_client_saw_at_time_of_trigger := (
-				character_resource.input.displayed_server_tick_at_time_of_trigger())
+				character_resource.character_state.input.displayed_server_tick_at_time_of_trigger())
 			var lag_compensated_world_state: Dictionary = (
 				world_state_per_server_tick[server_tick_client_saw_at_time_of_trigger])
 			if lag_compensated_world_state == null:
@@ -347,22 +343,13 @@ class ClientResources:
 		character_entity = null
 
 class ServerCharacterResource:
-	var input: ClientInput
-	var client_tick_for_input: int
-	var character_entity_id: int
 	var character_state: ServerCharacterState
 	var character_components: CharacterComponents
 
 	func _init(
-		input: ClientInput, 
-		client_tick_for_input: int,
-		character_entity_id: int,
 		current_physics_state: ServerCharacterState,
 		character_components: CharacterComponents
 	) -> void:
-		self.input = input
-		self.client_tick_for_input = client_tick_for_input
-		self.character_entity_id = character_entity_id
 		self.character_state = current_physics_state
 		self.character_components = character_components
 
@@ -387,9 +374,20 @@ class PerClientExportedData:
 		self.character_entity_id = character_entity_id
 
 class EntityCreator:
+	const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
+	const CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT := false
 	static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
-	static var DEFAULT_SERVER_CHARACTER_STATE := ServerCharacterState.new(
-		DEFAULT_PHYSICS_STATE, CharacterHealthState.DEFAULT_HEALTH_STATE)
+	static var DEFAULT_CLIENT_INPUT := ClientInput.new(
+		InputState.DEFAULT, 
+		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY, 
+		CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT)
+	static var CHARACTER_SPAWN_STATE_FACTORY := func(character_entity_id: int) -> ServerCharacterState:
+		return ServerCharacterState.new(
+			DEFAULT_PHYSICS_STATE, 
+			CharacterHealthState.DEFAULT_HEALTH_STATE,
+			Network.NO_TICK,
+			character_entity_id,
+			DEFAULT_CLIENT_INPUT)
 
 	var spawner_: EntitySpawner
 	var next_entity_id_: int = 0
@@ -402,7 +400,10 @@ class EntityCreator:
 		var character_components := spawner_.get_or_spawn_character(
 			character_entity_id, CONSTANTS.NetworkEntityMode.SERVER)
 		next_entity_id_ += 1
-		return CharacterEntity.new(DEFAULT_SERVER_CHARACTER_STATE, character_components, character_entity_id)
+		return CharacterEntity.new(
+			CHARACTER_SPAWN_STATE_FACTORY.call(character_entity_id),
+			character_components, 
+			character_entity_id)
 
 class Entity:
 	var entity_id: int
@@ -422,13 +423,50 @@ class CharacterEntity extends Entity:
 class ServerCharacterState:
 	var physics_state: CharacterPhysicsState
 	var health_state: CharacterHealthState
+	var client_tick_for_input: int
+	var character_entity_id: int
+	var input: ClientInput
 
-	func _init(physics_state: CharacterPhysicsState, health_state: CharacterHealthState) -> void:
+	func _init(
+		physics_state: CharacterPhysicsState, 
+		health_state: CharacterHealthState,
+		client_tick_for_input: int,
+		character_entity_id: int,
+		input: ClientInput
+	) -> void:
 		self.physics_state = physics_state
 		self.health_state = health_state
+		self.client_tick_for_input = client_tick_for_input
+		self.character_entity_id = character_entity_id
+		self.input = input
+	
+	func with_input(new_client_input_and_tick: QueueItem) -> ServerCharacterState:
+		var latest_client_input: ClientInput = new_client_input_and_tick.value()
+		var client_tick_for_input: int = new_client_input_and_tick.tick()
+		return ServerCharacterState.new(
+			physics_state,
+			health_state,
+			client_tick_for_input,
+			character_entity_id,
+			latest_client_input)
+	
+	func with_physics_and_health_state(
+		new_physics_state: CharacterPhysicsState, 
+		new_health_state: CharacterHealthState
+	) -> ServerCharacterState:
+		return ServerCharacterState.new(
+			new_physics_state, 
+			new_health_state, 
+			client_tick_for_input, 
+			character_entity_id,
+			input)
 
 	func _to_string() -> String:
-		return "ServerCharacterState<physics_state=%s, health_state=%s>" % [
+		return "ServerCharacterState<physics_state=%s, health_state=%s, client_tick_for_input=%s, " \
+				+ "character_entity_id=%s, input=%s>" % [
 			physics_state,
-			health_state    
+			health_state,
+			client_tick_for_input,
+			character_entity_id,
+			input
 		]
