@@ -2,7 +2,7 @@ extends AbstractCharacterAbilityAction
 class_name CharacterAbilityHitscanAction
 
 const TRACER_DOWNWARD_OFFSET := 0.5
-const HIT_DAMAGE := 100
+const HIT_DAMAGE := 1
 
 func perform_ability(
 		camera_transform: Transform3D,
