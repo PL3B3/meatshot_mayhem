@@ -1,4 +1,5 @@
 extends Node
+class_name Server
 
 const EMPTY_PHYSICS_STATE = {}
 const SPAWN_POINT_RANDOM_VARIATION = 5
@@ -26,17 +27,122 @@ func _ready() -> void:
 	add_child(network_message_bus_)
 	map_spawner.spawn(null)
 
+const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
+const CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT := false
+const ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP := 0
+static var DEFAULT_CLIENT_INPUT := ClientInput.new(
+	InputState.DEFAULT, 
+	EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY, 
+	CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT)
+static var DEFAULT_CHARACTER_SPAWN_STATE := ServerCharacterState.new(
+		DEFAULT_PHYSICS_STATE, 
+		CharacterHealthState.DEFAULT_HEALTH_STATE,
+		Network.NO_TICK,
+		ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP,
+		DEFAULT_CLIENT_INPUT)
+
+class PlayerLifeDeathState:
+	var ticks_until_respawn: int
+
+	func _init(ticks_until_respawn=0):
+		self.ticks_until_respawn = ticks_until_respawn
+
+class SimulationState:
+	var next_character_entity_id_: int = 0
+
+	var player_life_death_state_per_client_id: Dictionary = {}
+	var character_state_per_client_id: Dictionary = {}
+
+	func create_character(client_id: int, state: ServerCharacterState) -> void:
+		assert(
+			client_id not in character_state_per_client_id, 
+			"Attempting to create character for client %d which already has character" % client_id)
+		character_state_per_client_id[client_id] = state.with_entity_id(next_character_entity_id_)
+		next_character_entity_id_ += 1
+	
+	func delete_character(client_id: int) -> void:
+		character_state_per_client_id.erase(client_id)
+
+class WorldStateAndCharacterStateAndComponents:
+	var world_state: Dictionary
+	var character_state_and_components: Dictionary
+
+	func _init(world_state, character_state_and_components):
+		self.world_state = world_state
+		self.character_state_and_components = character_state_and_components
+
+var sim_state_: SimulationState = SimulationState.new()
+func __prepare_character_states_and_components() -> Dictionary:
+	# shenanigan: hacky: copy world state to sim state
+	sim_state_.character_state_per_client_id = world_state_.duplicate(true)
+
+	# map<client_id, latest input> client inputs = get inputs for all the existing clients
+	var latest_input_per_connected_client_id := client_session_dispatcher_.get_latest_input_per_connected_client_id()
+	# delete players with no corresponding connected client
+	for client_id_for_existing_player in sim_state_.player_life_death_state_per_client_id:
+		if not client_id_for_existing_player in latest_input_per_connected_client_id:
+			sim_state_.player_life_death_state_per_client_id.erase(client_id_for_existing_player)
+	# create/delete player states to align with clients in the above map
+	for connected_client_id: int in latest_input_per_connected_client_id:
+		if not connected_client_id in sim_state_.player_life_death_state_per_client_id:
+			sim_state_.player_life_death_state_per_client_id[connected_client_id] = PlayerLifeDeathState.new()
+	
+	# advance respawn timers
+	for client_id_for_existing_player in sim_state_.player_life_death_state_per_client_id:
+		var player_life_death_state: PlayerLifeDeathState = sim_state_.player_life_death_state_per_client_id[client_id_for_existing_player]
+		player_life_death_state.ticks_until_respawn = max(0, player_life_death_state.ticks_until_respawn - 1)
+	
+	# delete character with no corresp. player or dead player
+	for client_id_for_existing_character in sim_state_.character_state_per_client_id:
+		if not client_id_for_existing_character in sim_state_.player_life_death_state_per_client_id:
+			sim_state_.character_state_per_client_id.erase(client_id_for_existing_character)
+		else:
+			var player_life_death_state: PlayerLifeDeathState = sim_state_.player_life_death_state_per_client_id[client_id_for_existing_character]
+			if player_life_death_state.ticks_until_respawn > 0:
+				sim_state_.character_state_per_client_id.erase(client_id_for_existing_character)
+
+	# create/delete character states to align with player states
+	for client_id_for_existing_player in sim_state_.player_life_death_state_per_client_id:
+		var player_life_death_state: PlayerLifeDeathState = sim_state_.player_life_death_state_per_client_id[client_id_for_existing_player]
+		if player_life_death_state.ticks_until_respawn == 0 and not client_id_for_existing_player in sim_state_.character_state_per_client_id:
+			sim_state_.create_character(client_id_for_existing_player, DEFAULT_CHARACTER_SPAWN_STATE)
+			network_message_bus_.notify_client_of_respawn(client_id_for_existing_player)
+	
+	# copy over latest input to character state (hmm, we don't need to duplicate input at all actually)
+	for client_id_for_existing_character in sim_state_.character_state_per_client_id:
+		var character_state: ServerCharacterState = sim_state_.character_state_per_client_id[client_id_for_existing_character]
+		var latest_client_input_with_tick: QueueItem = latest_input_per_connected_client_id[client_id_for_existing_character]
+		var client_tick_for_input: int = latest_client_input_with_tick.tick()
+		var latest_client_input: ClientInput = latest_client_input_with_tick.value()
+		character_state.client_tick_for_input = client_tick_for_input
+		character_state.input = latest_client_input
+	
+	# copy back to world state -- gotta remove this
+	world_state_ = sim_state_.character_state_per_client_id.duplicate(true)
+
+	# arrange the StateAndComponents object
+	var character_state_and_components_per_client_id: Dictionary = {}
+	for client_id: int in sim_state_.character_state_per_client_id:
+		var server_state: ServerCharacterState = sim_state_.character_state_per_client_id[client_id]
+		var components := entity_spawner_.get_or_spawn_character(
+			server_state.character_entity_id, CONSTANTS.NetworkEntityMode.SERVER)
+		character_state_and_components_per_client_id[client_id] = ServerCharacterStateAndComponents.new(
+			server_state, components)
+	return character_state_and_components_per_client_id
+
+
 func _physics_process(_delta: float) -> void:
-	for newly_respawned_client_id: int in (
-		client_session_dispatcher_.advance_respawn_timers_and_return_newly_respawned_client_ids()
-	):
-		network_message_bus_.notify_client_of_respawn(newly_respawned_client_id)
+	# for newly_respawned_client_id: int in (
+	# 	client_session_dispatcher_.advance_respawn_timers_and_return_newly_respawned_client_ids()
+	# ):
+	# 	network_message_bus_.notify_client_of_respawn(newly_respawned_client_id)
 
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
 	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
-	var active_client_sessions := client_session_dispatcher_.get_active_client_sessions()
-	var character_state_and_components_per_client_id := __prepare_character_state_and_components_per_client_id(
-		active_client_sessions, world_state_)
+	# var active_client_sessions := client_session_dispatcher_.get_active_client_sessions()
+	# var character_state_and_components_per_client_id := __prepare_character_state_and_components_per_client_id(
+	# 	active_client_sessions, world_state_)
+	var character_state_and_components_per_client_id := __prepare_character_states_and_components()
 	var hitscan_results := __compute_hitscan_ability_results(
 		world_state_, world_state_per_server_tick_, character_state_and_components_per_client_id)
 	var next_world_state := __compute_next_state_for_characters(
@@ -49,12 +155,14 @@ func _physics_process(_delta: float) -> void:
 	__draw_bullet_hits(debug_sphere_displayer, hitscan_results)
 
 	for client_id: int in character_state_and_components_per_client_id:
-		var character_state_and_components: ServerCharacterStateAndComponents = (
-			character_state_and_components_per_client_id[client_id])
-		var character_entity_id := character_state_and_components.character_state.character_entity_id
-		var next_character_state: ServerCharacterState = next_world_state[character_entity_id]
+		# var character_state_and_components: ServerCharacterStateAndComponents = (
+		# 	character_state_and_components_per_client_id[client_id])
+		# var character_entity_id := character_state_and_components.character_state.character_entity_id
+		var next_character_state: ServerCharacterState = next_world_state[client_id]
 		if next_character_state.health_state.health() <= 0:
-			next_world_state.erase(next_character_state)
+			next_world_state.erase(client_id)
+			sim_state_.character_state_per_client_id.erase(client_id)
+			sim_state_.player_life_death_state_per_client_id[client_id] = PlayerLifeDeathState.new(RESPAWN_TIME_IN_TICKS)
 			client_session_dispatcher_.despawn_client_character(client_id)
 			network_message_bus_.notify_client_of_death(client_id)
 
@@ -145,20 +253,20 @@ static func __compute_next_state_for_characters(
 				current_health -= hitscan_result.damage
 		var next_health_state := CharacterHealthState.new(current_health)
 		
-		next_world_state[character_entity_id] = (
+		next_world_state[client_id] = (
 			character_state_and_components.character_state.with_physics_and_health_state(
 				next_physics_state, next_health_state))
 	return next_world_state
 
 static func __display_character_states(
 	character_state_and_components_per_client_id: Dictionary,
-	next_character_state_per_entity_id: Dictionary
+	next_character_state_per_client_id: Dictionary
 ) -> void:
 	for client_id: int in character_state_and_components_per_client_id:
 		var character_state_and_components: ServerCharacterStateAndComponents = (
 			character_state_and_components_per_client_id[client_id])
-		var character_entity_id := character_state_and_components.character_state.character_entity_id
-		var next_character_state: ServerCharacterState = next_character_state_per_entity_id[character_entity_id]
+		# var character_entity_id := character_state_and_components.character_state.character_entity_id
+		var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
 		var character_components := character_state_and_components.character_components
 		var character_transform_state := __extract_transform_state(character_state_and_components, next_character_state)
 		character_components.third_person_display().display_character_transform(character_transform_state)
@@ -167,14 +275,14 @@ static func __display_character_states(
 
 static func __compile_data_to_export_per_client(
 	character_state_and_components_per_client_id: Dictionary,
-	next_character_state_per_entity_id: Dictionary
+	next_character_state_per_client_id: Dictionary
 ) -> Dictionary:
 	var data_to_export_per_client := {}
 	for client_id: int in character_state_and_components_per_client_id:
 		var character_state_and_components: ServerCharacterStateAndComponents = (
 			character_state_and_components_per_client_id[client_id])
 		var character_entity_id := character_state_and_components.character_state.character_entity_id
-		var next_character_state: ServerCharacterState = next_character_state_per_entity_id[character_entity_id]
+		var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
 		var next_transform_state := __extract_transform_state(character_state_and_components, next_character_state)
 		data_to_export_per_client[client_id] = PerClientExportedData.new(
 			character_state_and_components.character_state.client_tick_for_input,
@@ -256,11 +364,13 @@ static func __extract_positions_for_other_characters(
 	own_character_entity_id: int
 ) -> Dictionary:
 	var other_character_positions_per_entity_id: Dictionary = {}
-	for character_entity_id: int in world_state:
+	for client_id: int in world_state:
+		var character_state: ServerCharacterState = world_state[client_id]
+		var character_entity_id := character_state.character_entity_id
 		if character_entity_id != own_character_entity_id:
-			var other_character_state: ServerCharacterState = world_state[character_entity_id]
+			# var other_character_state: ServerCharacterState = world_state[character_entity_id]
 			other_character_positions_per_entity_id[character_entity_id] = (
-				other_character_state.physics_state.position())
+				character_state.physics_state.position())
 	return other_character_positions_per_entity_id
 
 static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: InputState) -> CharacterPhysicsState:
@@ -302,6 +412,13 @@ class ActiveClientSessions:
 	
 	func get_active_client_sessions() -> Dictionary:
 		return active_session_per_client_id_.duplicate(true)
+
+	func get_latest_input_per_connected_client_id() -> Dictionary:
+		var latest_input_per_client := {}
+		for client_id in active_session_per_client_id_:
+			var c: ClientResources = active_session_per_client_id_[client_id]
+			latest_input_per_client[client_id] = c.input_buffer.pop()
+		return latest_input_per_client
 
 	func advance_respawn_timers_and_return_newly_respawned_client_ids() -> Array[int]: 
 		var newly_respawned_client_ids: Array[int] = []
@@ -453,14 +570,22 @@ class ServerCharacterState:
 		self.input = input
 	
 	func with_input(new_client_input_and_tick: QueueItem) -> ServerCharacterState:
-		var latest_client_input: ClientInput = new_client_input_and_tick.value()
-		var client_tick_for_input: int = new_client_input_and_tick.tick()
+		var new_client_input: ClientInput = new_client_input_and_tick.value()
+		var new_client_tick_for_input: int = new_client_input_and_tick.tick()
+		return ServerCharacterState.new(
+			physics_state,
+			health_state,
+			new_client_tick_for_input,
+			character_entity_id,
+			new_client_input)
+	
+	func with_entity_id(new_character_entity_id: int) -> ServerCharacterState:
 		return ServerCharacterState.new(
 			physics_state,
 			health_state,
 			client_tick_for_input,
-			character_entity_id,
-			latest_client_input)
+			new_character_entity_id,
+			input)
 	
 	func with_physics_and_health_state(
 		new_physics_state: CharacterPhysicsState, 

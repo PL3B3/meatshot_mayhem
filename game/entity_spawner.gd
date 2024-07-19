@@ -46,7 +46,7 @@ func despawn_all_entities() -> void:
 		remove_child(tracer_displayer_)
 		tracer_displayer_.queue_free()
 		tracer_displayer_ = null
-	if debug_sphere_displayer_ == null:
+	if debug_sphere_displayer_ != null:
 		remove_child(debug_sphere_displayer_)
 		debug_sphere_displayer_.queue_free()
 		debug_sphere_displayer_ = null
@@ -69,8 +69,9 @@ func despawn_entities_not_in_client_snapshot(client_state_snapshot: ClientStateS
 
 func despawn_entities_not_in_server_snapshot(server_state_snapshot: Dictionary) -> void:
 	var entity_ids_in_snapshot: Array[int] = []
-	for character_entity_id: int in server_state_snapshot.keys():
-		entity_ids_in_snapshot.push_back(character_entity_id)
+	for client_id: int in server_state_snapshot.keys():
+		var character_state: Server.ServerCharacterState = server_state_snapshot[client_id]
+		entity_ids_in_snapshot.push_back(character_state.character_entity_id)
 	__despawn_entities(entity_ids_in_snapshot)
 
 func __despawn_entities(entity_ids_in_latest_snapshot: Array[int]) -> void:
