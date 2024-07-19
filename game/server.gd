@@ -15,8 +15,7 @@ static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 @onready var client_session_dispatcher_ := ActiveClientSessions.new(entity_creator_)
 
 var network_message_bus_: NetworkMessageAndEventBus
-var world_state_per_server_tick_ := {}
-var world_state_ := {}
+var simulation_state_per_server_tick_ := {}
 var tick_ := 0
 
 func _ready() -> void:
@@ -53,6 +52,15 @@ class SimulationState:
 	var player_life_death_state_per_client_id: Dictionary = {}
 	var character_state_per_client_id: Dictionary = {}
 
+	func _init(
+		next_character_entity_id_: int = 0, 
+		player_life_death_state_per_client_id: Dictionary = {}, 
+		character_state_per_client_id: Dictionary = {}
+	) -> void:
+		self.next_character_entity_id_ = next_character_entity_id_
+		self.player_life_death_state_per_client_id = player_life_death_state_per_client_id
+		self.character_state_per_client_id = character_state_per_client_id
+
 	func create_character(client_id: int, state: ServerCharacterState) -> void:
 		assert(
 			client_id not in character_state_per_client_id, 
@@ -62,6 +70,15 @@ class SimulationState:
 	
 	func delete_character(client_id: int) -> void:
 		character_state_per_client_id.erase(client_id)
+	
+	func with_character_states(new_character_state_per_client_id: Dictionary) -> SimulationState:
+		return SimulationState.new()
+	
+	func deep_copy() -> SimulationState:
+		return SimulationState.new(
+			next_character_entity_id_, 
+			player_life_death_state_per_client_id.duplicate(true), 
+			character_state_per_client_id.duplicate(true))
 
 class WorldStateAndCharacterStateAndComponents:
 	var world_state: Dictionary
@@ -73,9 +90,6 @@ class WorldStateAndCharacterStateAndComponents:
 
 var sim_state_: SimulationState = SimulationState.new()
 func __prepare_character_states_and_components() -> Dictionary:
-	# shenanigan: hacky: copy world state to sim state
-	sim_state_.character_state_per_client_id = world_state_.duplicate(true)
-
 	# map<client_id, latest input> client inputs = get inputs for all the existing clients
 	var latest_input_per_connected_client_id := client_session_dispatcher_.get_latest_input_per_connected_client_id()
 	# delete players with no corresponding connected client
@@ -116,9 +130,6 @@ func __prepare_character_states_and_components() -> Dictionary:
 		var latest_client_input: ClientInput = latest_client_input_with_tick.value()
 		character_state.client_tick_for_input = client_tick_for_input
 		character_state.input = latest_client_input
-	
-	# copy back to world state -- gotta remove this
-	world_state_ = sim_state_.character_state_per_client_id.duplicate(true)
 
 	# arrange the StateAndComponents object
 	var character_state_and_components_per_client_id: Dictionary = {}
@@ -143,14 +154,14 @@ func _physics_process(_delta: float) -> void:
 	# var character_state_and_components_per_client_id := __prepare_character_state_and_components_per_client_id(
 	# 	active_client_sessions, world_state_)
 	var character_state_and_components_per_client_id := __prepare_character_states_and_components()
-	var hitscan_results := __compute_hitscan_ability_results(
-		world_state_, world_state_per_server_tick_, character_state_and_components_per_client_id)
-	var next_world_state := __compute_next_state_for_characters(
+	var hitscan_results := __compute_hitscan_ability_results2(
+		sim_state_, simulation_state_per_server_tick_, character_state_and_components_per_client_id)
+	var next_character_state_per_client_id := __compute_next_state_for_characters(
 		character_state_and_components_per_client_id, hitscan_results)
 	var data_to_export_per_client := __compile_data_to_export_per_client(
-		character_state_and_components_per_client_id, next_world_state)
+		character_state_and_components_per_client_id, next_character_state_per_client_id)
 
-	__display_character_states(character_state_and_components_per_client_id, next_world_state)
+	__display_character_states(character_state_and_components_per_client_id, next_character_state_per_client_id)
 	__draw_bullet_tracers(tracer_displayer, hitscan_results)
 	__draw_bullet_hits(debug_sphere_displayer, hitscan_results)
 
@@ -158,27 +169,29 @@ func _physics_process(_delta: float) -> void:
 		# var character_state_and_components: ServerCharacterStateAndComponents = (
 		# 	character_state_and_components_per_client_id[client_id])
 		# var character_entity_id := character_state_and_components.character_state.character_entity_id
-		var next_character_state: ServerCharacterState = next_world_state[client_id]
+		var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
 		if next_character_state.health_state.health() <= 0:
-			next_world_state.erase(client_id)
+			next_character_state_per_client_id.erase(client_id)
 			sim_state_.character_state_per_client_id.erase(client_id)
 			sim_state_.player_life_death_state_per_client_id[client_id] = PlayerLifeDeathState.new(RESPAWN_TIME_IN_TICKS)
 			client_session_dispatcher_.despawn_client_character(client_id)
 			network_message_bus_.notify_client_of_death(client_id)
 
-	entity_spawner_.despawn_entities_not_in_server_snapshot(next_world_state)
+	# print(next_character_state_per_client_id)
+
+	entity_spawner_.despawn_entities_not_in_server_snapshot(next_character_state_per_client_id)
 	__replicate_ability_trigger_on_remote_characters(character_state_and_components_per_client_id)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
-	world_state_ = next_world_state
+	sim_state_.character_state_per_client_id = next_character_state_per_client_id
 	
-	world_state_per_server_tick_[tick_] = next_world_state
-	__clear_old_world_states()
+	simulation_state_per_server_tick_[tick_] = sim_state_.deep_copy()
+	__clear_stale_simulation_states()
 	tick_ += 1
 
-func __clear_old_world_states() -> void:
-	for old_tick: int in world_state_per_server_tick_.keys():
-		if old_tick < tick_ - 100:
-			world_state_per_server_tick_.erase(old_tick)
+func __clear_stale_simulation_states() -> void:
+	for stale_tick: int in simulation_state_per_server_tick_.keys():
+		if stale_tick < tick_ - 100:
+			simulation_state_per_server_tick_.erase(stale_tick)
 
 func __replicate_ability_trigger_on_remote_characters(character_state_and_components_per_client_id: Dictionary) -> void:
 	for client_id: int in character_state_and_components_per_client_id:
@@ -300,6 +313,43 @@ static func __extract_transform_state(
 			character_state.physics_state.position(), 
 			character_state_and_components.character_state.input.input_state().pitch(), 
 			character_state_and_components.character_state.input.input_state().yaw())
+
+static func __compute_hitscan_ability_results2(
+	current_simulation_state: SimulationState,
+	simulation_state_per_server_tick: Dictionary,
+	character_state_and_components_per_client_id: Dictionary
+) -> Array[HitscanResult]:
+	var hitscan_ability_results: Array[HitscanResult] = []
+	for client_id: int in character_state_and_components_per_client_id:
+		var character_state_and_components: ServerCharacterStateAndComponents = (
+			character_state_and_components_per_client_id[client_id])
+		if character_state_and_components.character_state.input.is_triggered():
+			var character_entity_id := character_state_and_components.character_state.character_entity_id
+			var character_components := character_state_and_components.character_components
+			var latest_input_state := character_state_and_components.character_state.input.input_state()
+			var character_transform_state := CharacterTransformState.new(
+				character_state_and_components.character_state.physics_state.position(), 
+				latest_input_state.pitch(), 
+				latest_input_state.yaw())
+			var server_tick_client_saw_at_time_of_trigger := (
+				character_state_and_components.character_state.input.displayed_server_tick_at_time_of_trigger())
+			var simulation_state_at_time_of_trigger: SimulationState = (
+				simulation_state_per_server_tick[server_tick_client_saw_at_time_of_trigger])
+			var lag_compensated_world_state: Dictionary
+			if simulation_state_at_time_of_trigger != null:
+				lag_compensated_world_state = simulation_state_at_time_of_trigger.character_state_per_client_id
+			else:
+				print("Cannot lag compensate hitscan ability against state with tick %d. Current tick: %d" % [
+					server_tick_client_saw_at_time_of_trigger])
+				lag_compensated_world_state = current_simulation_state.character_state_per_client_id
+			var character_camera_transform: Transform3D = (
+				character_components.first_person_display().compute_camera_transform(character_transform_state))
+			var other_character_positions_during_current_tick := (
+				__extract_positions_for_other_characters(lag_compensated_world_state, character_entity_id))
+			var ability_result := character_components.ability_action().perform_ability(
+				character_camera_transform, other_character_positions_during_current_tick)
+			hitscan_ability_results.append_array(ability_result.hitscan_results)
+	return hitscan_ability_results
 
 static func __compute_hitscan_ability_results(
 	current_world_state: Dictionary, 
