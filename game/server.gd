@@ -279,15 +279,6 @@ static func __extract_positions_for_other_characters(
 				character_state.physics_state.position())
 	return other_character_positions_per_entity_id
 
-static func __apply_debug_motion(physics_state: CharacterPhysicsState, input: InputState) -> CharacterPhysicsState:
-	if input.is_slow_walking():
-		return CharacterPhysicsState.new(
-			physics_state.position() + Vector3(0.5, 0.0, 0),
-			physics_state.velocity() + Vector3(0, 0.0, -2),
-			physics_state.is_grounded())
-	else:
-		return physics_state
-
 class ActiveClientSessions:
 	static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputBuffer: 
 		return OrderedInputBuffer.new("sv_input_buf[%10d]" % x)
