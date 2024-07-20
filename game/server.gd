@@ -57,8 +57,6 @@ func _physics_process(_delta: float) -> void:
 		simulation_state_, simulation_state_per_server_tick_, character_state_and_components_per_client_id)
 	var next_character_state_per_client_id := __compute_next_state_for_characters(
 		character_state_and_components_per_client_id, hitscan_results)
-	var data_to_export_per_client := __compile_data_to_export_per_client(
-		character_state_and_components_per_client_id, next_character_state_per_client_id)
 
 	__display_character_states(character_state_and_components_per_client_id, next_character_state_per_client_id)
 	__draw_bullet_tracers(tracer_displayer, hitscan_results)
@@ -76,6 +74,8 @@ func _physics_process(_delta: float) -> void:
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_character_state_per_client_id)
 	__replicate_ability_trigger_on_remote_characters(character_state_and_components_per_client_id)
+	
+	var data_to_export_per_client := __compile_data_to_export_per_client(next_character_state_per_client_id)
 	__export_state_snapshots_to_clients(data_to_export_per_client)
 	simulation_state_.character_state_per_client_id = next_character_state_per_client_id
 	
@@ -244,38 +244,29 @@ static func __display_character_states(
 			character_state_and_components_per_client_id[client_id])
 		var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
 		var character_components := character_state_and_components.character_components
-		var character_transform_state := __extract_transform_state(character_state_and_components, next_character_state)
+		var character_transform_state := __extract_transform_state(next_character_state)
 		character_components.third_person_display().display_character_transform(character_transform_state)
 		character_components.first_person_display().display_character_state(
 			character_transform_state, next_character_state.health_state.health())
 
-static func __compile_data_to_export_per_client(
-	character_state_and_components_per_client_id: Dictionary,
-	next_character_state_per_client_id: Dictionary
-) -> Dictionary:
+static func __compile_data_to_export_per_client(next_character_state_per_client_id: Dictionary) -> Dictionary:
 	var data_to_export_per_client := {}
-	for client_id: int in character_state_and_components_per_client_id:
-		var character_state_and_components: ServerCharacterStateAndComponents = (
-			character_state_and_components_per_client_id[client_id])
-		var character_entity_id := character_state_and_components.character_state.character_entity_id
+	for client_id: int in next_character_state_per_client_id:
 		var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
-		var next_transform_state := __extract_transform_state(character_state_and_components, next_character_state)
+		var next_transform_state := __extract_transform_state(next_character_state)
 		data_to_export_per_client[client_id] = PerClientExportedData.new(
-			character_state_and_components.character_state.client_tick_for_input,
+			next_character_state.client_tick_for_input,
 			next_character_state.physics_state,
 			next_character_state.health_state,
 			next_transform_state,
-			character_entity_id)
+			next_character_state.character_entity_id)
 	return data_to_export_per_client
 
-static func __extract_transform_state(
-	character_state_and_components: ServerCharacterStateAndComponents, 
-	character_state: ServerCharacterState
-) -> CharacterTransformState:
+static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
 	return CharacterTransformState.new(
 			character_state.physics_state.position(), 
-			character_state_and_components.character_state.input.input_state().pitch(), 
-			character_state_and_components.character_state.input.input_state().yaw())
+			character_state.input.input_state().pitch(), 
+			character_state.input.input_state().yaw())
 
 static func __compute_hitscan_ability_results(
 	current_simulation_state: SimulationState,
