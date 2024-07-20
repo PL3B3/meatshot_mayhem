@@ -24,8 +24,7 @@ static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 
 @onready var map_spawner: MultiplayerSpawner = $MapSpawner
 @onready var entity_spawner_: EntitySpawner= $EntitySpawner
-@onready var entity_creator_ := EntityCreator.new(entity_spawner_)
-@onready var client_session_dispatcher_ := ActiveClientSessions.new(entity_creator_)
+@onready var client_session_dispatcher_ := ActiveClientSessions.new()
 
 var network_message_bus_: NetworkMessageAndEventBus
 var authoritative_state_exporter_ := ServerToClientStateSnapshotExporter.new()
@@ -71,7 +70,6 @@ func _physics_process(_delta: float) -> void:
 			simulation_state_.character_state_per_client_id.erase(client_id)
 			simulation_state_.player_life_death_state_per_client_id[client_id] = (
 				PlayerLifeDeathState.new(RESPAWN_TIME_IN_TICKS))
-			client_session_dispatcher_.despawn_client_character(client_id)
 			network_message_bus_.notify_client_of_death(client_id)
 
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_character_state_per_client_id)
@@ -173,26 +171,6 @@ func __replicate_ability_trigger_on_remote_characters(character_state_and_compon
 				character_components.first_person_display().compute_camera_transform(character_transform_state))
 			network_message_bus_.trigger_remote_character_ability(
 				character_state_and_components.character_state.character_entity_id, character_camera_transform, tick_)
-
-static func __prepare_character_state_and_components_per_client_id(
-	client_resources_per_peer_id: Dictionary,
-	server_character_state_per_entity_id: Dictionary
-) -> Dictionary:
-	var character_state_and_components_per_client_id: Dictionary = {}
-	for client_id: int in client_resources_per_peer_id:
-		var client_input_buffer_and_character: ClientResources = client_resources_per_peer_id[client_id]
-		var client_character_entity := client_input_buffer_and_character.get_or_spawn_character_entity_if_alive()
-		if client_character_entity != null:
-			var latest_client_input_with_tick: QueueItem = client_input_buffer_and_character.input_buffer.pop()
-			var character_state: ServerCharacterState = Utils.get_or_default(
-				server_character_state_per_entity_id, 
-				client_character_entity.entity_id, 
-				client_character_entity.state_data)
-			var character_state_updated_with_input := character_state.with_input(latest_client_input_with_tick)
-			character_state_and_components_per_client_id[client_id] = ServerCharacterStateAndComponents.new(
-				character_state_updated_with_input,
-				client_character_entity.components)
-	return character_state_and_components_per_client_id
 
 static func __compute_next_state_for_characters(
 	character_state_and_components_per_client_id: Dictionary,
@@ -315,89 +293,27 @@ class ActiveClientSessions:
 		return OrderedInputBuffer.new("sv_input_buf[%10d]" % x)
 	
 	var active_session_per_client_id_ := {}
-	var entity_creator_: EntityCreator
-
-	func _init(entity_creator: EntityCreator) -> void:
-		entity_creator_ = entity_creator
 
 	func add_new_client_session(client_id: int) -> void:
-		var client_character_entity: CharacterEntity = entity_creator_.create_character_entity()
 		var input_buffer_for_client: OrderedInputBuffer = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
-		var client_resources: ClientResources = ClientResources.new(
-			input_buffer_for_client, client_character_entity, entity_creator_)
-		active_session_per_client_id_[client_id] = client_resources
+		active_session_per_client_id_[client_id] = input_buffer_for_client
 
 	func remove_client_session(client_id: int) -> void:
 		active_session_per_client_id_.erase(client_id)
 
 	func dispatch_input_message(client_id: int, input: ClientToServerInputMessage) -> void:
 		if client_id in active_session_per_client_id_:
-			var client_resources: ClientResources = active_session_per_client_id_[client_id]
-			var input_buffer_for_client: OrderedInputBuffer = client_resources.input_buffer
+			var input_buffer_for_client: OrderedInputBuffer = active_session_per_client_id_[client_id]
 			input_buffer_for_client.push(input.client_input(), input.client_tick())
 		else:
 			print("Cannot enqueue input %s from client %d. No input buffer initialized." % [input, client_id])
-	
-	func get_active_client_sessions() -> Dictionary:
-		return active_session_per_client_id_.duplicate(true)
 
 	func get_latest_input_per_connected_client_id() -> Dictionary:
 		var latest_input_per_client := {}
 		for client_id: int in active_session_per_client_id_:
-			var c: ClientResources = active_session_per_client_id_[client_id]
-			latest_input_per_client[client_id] = c.input_buffer.pop()
+			var input_buffer_for_client: OrderedInputBuffer = active_session_per_client_id_[client_id]
+			latest_input_per_client[client_id] = input_buffer_for_client.pop()
 		return latest_input_per_client
-
-	func advance_respawn_timers_and_return_newly_respawned_client_ids() -> Array[int]: 
-		var newly_respawned_client_ids: Array[int] = []
-		for client_id: int in active_session_per_client_id_:
-			var client_resources: ClientResources = active_session_per_client_id_[client_id]
-			if client_resources.advance_respawn_timer():
-				newly_respawned_client_ids.push_back(client_id)
-		return newly_respawned_client_ids
-	
-	func despawn_client_character(client_id: int) -> void:
-		if client_id in active_session_per_client_id_:
-			var client_resources: ClientResources = active_session_per_client_id_[client_id]
-			client_resources.despawn()
-
-class ClientResources:
-	const JUST_RESPAWNED := true
-	const STILL_DEAD_OR_ALREADY_RESPAWNED := false
-
-	var input_buffer: OrderedInputBuffer
-	var character_entity: CharacterEntity
-	var ticks_until_respawn: int
-	var entity_creator: EntityCreator
-
-	func _init(
-		input_buffer: OrderedInputBuffer, 
-		character_entity: CharacterEntity, 
-		entity_creator: EntityCreator
-	) -> void:
-		self.input_buffer = input_buffer
-		self.character_entity = character_entity
-		self.entity_creator = entity_creator
-		ticks_until_respawn = 0
-	
-	func advance_respawn_timer() -> bool:
-		if ticks_until_respawn > 0:
-			ticks_until_respawn -= 1
-			if ticks_until_respawn == 0:
-				return JUST_RESPAWNED
-		return STILL_DEAD_OR_ALREADY_RESPAWNED
-	
-	func get_or_spawn_character_entity_if_alive() -> CharacterEntity:
-		if ticks_until_respawn == 0:
-			if character_entity == null:
-				character_entity = entity_creator.create_character_entity()
-			return character_entity
-		else:
-			return null
-	
-	func despawn() -> void:
-		ticks_until_respawn = RESPAWN_TIME_IN_TICKS
-		character_entity = null
 
 class ServerToClientStateSnapshotExporter:
 	signal export_state_snapshot(client_id: int, server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
@@ -488,53 +404,6 @@ class ServerCharacterStateAndComponents:
 	) -> void:
 		self.character_state = current_physics_state
 		self.character_components = character_components
-
-class EntityCreator:
-	const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
-	const CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT := false
-	static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
-	static var DEFAULT_CLIENT_INPUT := ClientInput.new(
-		InputState.DEFAULT, 
-		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY, 
-		CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT)
-	static var CHARACTER_SPAWN_STATE_FACTORY := func(character_entity_id: int) -> ServerCharacterState:
-		return ServerCharacterState.new(
-			DEFAULT_PHYSICS_STATE, 
-			CharacterHealthState.DEFAULT_HEALTH_STATE,
-			Network.NO_TICK,
-			character_entity_id,
-			DEFAULT_CLIENT_INPUT)
-
-	var spawner_: EntitySpawner
-	var next_entity_id_: int = 0
-
-	func _init(spawner: EntitySpawner) -> void:
-		spawner_ = spawner
-
-	func create_character_entity() -> CharacterEntity:
-		var character_entity_id := next_entity_id_
-		var character_components := spawner_.get_or_spawn_character(
-			character_entity_id, CONSTANTS.NetworkEntityMode.SERVER)
-		next_entity_id_ += 1
-		return CharacterEntity.new(
-			CHARACTER_SPAWN_STATE_FACTORY.call(character_entity_id),
-			character_components, 
-			character_entity_id)
-
-class Entity:
-	var entity_id: int
-
-	func _init(entity_id: int) -> void:
-		self.entity_id = entity_id
-
-class CharacterEntity extends Entity:
-	var state_data: ServerCharacterState
-	var components: CharacterComponents
-
-	func _init(state_data: ServerCharacterState, components: CharacterComponents, entity_id: int) -> void:
-		super(entity_id)
-		self.state_data = state_data
-		self.components = components
 
 class ServerCharacterState:
 	var physics_state: CharacterPhysicsState
