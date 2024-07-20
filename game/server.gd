@@ -28,12 +28,14 @@ static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 @onready var client_session_dispatcher_ := ActiveClientSessions.new(entity_creator_)
 
 var network_message_bus_: NetworkMessageAndEventBus
+var authoritative_state_exporter_ := ServerToClientStateSnapshotExporter.new()
 var simulation_state_: SimulationState = SimulationState.new()
 var simulation_state_per_server_tick_ := {}
 var tick_ := 0
 
 func _ready() -> void:
 	network_message_bus_ = NetworkMessageAndEventBus.new()
+	authoritative_state_exporter_.export_state_snapshot.connect(network_message_bus_.send_state_snapshot_to_client)
 	network_message_bus_.received_client_input.connect(client_session_dispatcher_.dispatch_input_message)
 	network_message_bus_.client_disconnected.connect(client_session_dispatcher_.remove_client_session)
 	network_message_bus_.client_connected.connect(client_session_dispatcher_.add_new_client_session)
@@ -75,8 +77,7 @@ func _physics_process(_delta: float) -> void:
 	entity_spawner_.despawn_entities_not_in_server_snapshot(next_character_state_per_client_id)
 	__replicate_ability_trigger_on_remote_characters(character_state_and_components_per_client_id)
 	
-	var data_to_export_per_client := __compile_data_to_export_per_client(next_character_state_per_client_id)
-	__export_state_snapshots_to_clients(data_to_export_per_client)
+	authoritative_state_exporter_.export_state_snapshots_to_clients(tick_, next_character_state_per_client_id)
 	simulation_state_.character_state_per_client_id = next_character_state_per_client_id
 	
 	simulation_state_per_server_tick_[tick_] = simulation_state_.deep_copy()
@@ -173,23 +174,6 @@ func __replicate_ability_trigger_on_remote_characters(character_state_and_compon
 			network_message_bus_.trigger_remote_character_ability(
 				character_state_and_components.character_state.character_entity_id, character_camera_transform, tick_)
 
-func __export_state_snapshots_to_clients(data_to_export_per_client: Dictionary) -> Dictionary:
-	var state_snapshots_for_clients: Dictionary = {}
-	for client_id: int in data_to_export_per_client:
-		var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
-		var remote_character_state_per_entity: Dictionary = __extract_states_for_remote_characters(
-			data_to_export_per_client, client_id)
-		var client_own_character_state := ClientOwnCharacterState.new(
-			client_snapshot_data.physics_state, 
-			EMPTY_ABILITY_TRIGGER_STATE, 
-			client_snapshot_data.health_state,
-			InputState.DEFAULT)
-		var state_snapshot_for_client := ServerToClientStateSnapshotMessage.new(
-			client_snapshot_data.client_tick, 
-			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
-		network_message_bus_.send_state_snapshot_to_client(client_id, tick_, state_snapshot_for_client)
-	return state_snapshots_for_clients
-
 static func __prepare_character_state_and_components_per_client_id(
 	client_resources_per_peer_id: Dictionary,
 	server_character_state_per_entity_id: Dictionary
@@ -249,19 +233,6 @@ static func __display_character_states(
 		character_components.first_person_display().display_character_state(
 			character_transform_state, next_character_state.health_state.health())
 
-static func __compile_data_to_export_per_client(next_character_state_per_client_id: Dictionary) -> Dictionary:
-	var data_to_export_per_client := {}
-	for client_id: int in next_character_state_per_client_id:
-		var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
-		var next_transform_state := __extract_transform_state(next_character_state)
-		data_to_export_per_client[client_id] = PerClientExportedData.new(
-			next_character_state.client_tick_for_input,
-			next_character_state.physics_state,
-			next_character_state.health_state,
-			next_transform_state,
-			next_character_state.character_entity_id)
-	return data_to_export_per_client
-
 static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
 	return CharacterTransformState.new(
 			character_state.physics_state.position(), 
@@ -316,18 +287,6 @@ static func __draw_bullet_hits(
 ) -> void:
 	for hitscan_result: HitscanResult in hitscan_results:
 		debug_sphere_displayer.draw_debug_sphere(hitscan_result.hit_point)
-
-static func __extract_states_for_remote_characters(
-	data_to_export_per_client: Dictionary, 
-	own_client_id: int
-) -> Dictionary:
-	var states_for_remote_characters := {}
-	for client_id: int in data_to_export_per_client:
-		if client_id != own_client_id:
-			var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
-			var remote_character_entity_id: int = client_snapshot_data.character_entity_id
-			states_for_remote_characters[remote_character_entity_id] = client_snapshot_data.transform_state
-	return states_for_remote_characters
 
 static func __extract_positions_for_other_characters(
 	world_state: Dictionary, 
@@ -440,6 +399,85 @@ class ClientResources:
 		ticks_until_respawn = RESPAWN_TIME_IN_TICKS
 		character_entity = null
 
+class ServerToClientStateSnapshotExporter:
+	signal export_state_snapshot(client_id: int, server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
+
+	static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
+
+	func export_state_snapshots_to_clients(server_tick: int, next_character_state_per_client_id: Dictionary) -> void:
+		var data_to_export_per_client := __compile_data_to_export_per_client(next_character_state_per_client_id)
+		for client_id: int in data_to_export_per_client:
+			__export_state_snapshot_to_client(client_id, server_tick, data_to_export_per_client)
+	
+	func __export_state_snapshot_to_client(
+		client_id: int, 
+		server_tick: int, 
+		data_to_export_per_client: Dictionary
+	) -> void:
+		var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
+		var remote_character_state_per_entity: Dictionary = __extract_states_for_remote_characters(
+			data_to_export_per_client, client_id)
+		var client_own_character_state := ClientOwnCharacterState.new(
+			client_snapshot_data.physics_state, 
+			EMPTY_ABILITY_TRIGGER_STATE, 
+			client_snapshot_data.health_state,
+			InputState.DEFAULT)
+		var state_snapshot_for_client := ServerToClientStateSnapshotMessage.new(
+			client_snapshot_data.client_tick, 
+			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
+		export_state_snapshot.emit(client_id, server_tick, state_snapshot_for_client)
+
+	static func __extract_states_for_remote_characters(
+		data_to_export_per_client: Dictionary, 
+		own_client_id: int
+	) -> Dictionary:
+		var states_for_remote_characters := {}
+		for client_id: int in data_to_export_per_client:
+			if client_id != own_client_id:
+				var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
+				var remote_character_entity_id: int = client_snapshot_data.character_entity_id
+				states_for_remote_characters[remote_character_entity_id] = client_snapshot_data.transform_state
+		return states_for_remote_characters
+	
+	static func __compile_data_to_export_per_client(next_character_state_per_client_id: Dictionary) -> Dictionary:
+		var data_to_export_per_client := {}
+		for client_id: int in next_character_state_per_client_id:
+			var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
+			var next_transform_state := __extract_transform_state(next_character_state)
+			data_to_export_per_client[client_id] = PerClientExportedData.new(
+				next_character_state.client_tick_for_input,
+				next_character_state.physics_state,
+				next_character_state.health_state,
+				next_transform_state,
+				next_character_state.character_entity_id)
+		return data_to_export_per_client
+	
+	static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
+		return CharacterTransformState.new(
+				character_state.physics_state.position(), 
+				character_state.input.input_state().pitch(), 
+				character_state.input.input_state().yaw())
+	
+	class PerClientExportedData:
+		var client_tick: int
+		var physics_state: CharacterPhysicsState
+		var health_state: CharacterHealthState
+		var transform_state: CharacterTransformState
+		var character_entity_id: int
+
+		func _init(
+			client_tick: int,
+			physics_state: CharacterPhysicsState,
+			health_state: CharacterHealthState,
+			transform_state: CharacterTransformState,
+			character_entity_id: int
+		) -> void: 
+			self.client_tick = client_tick
+			self.physics_state = physics_state
+			self.health_state = health_state
+			self.transform_state = transform_state
+			self.character_entity_id = character_entity_id
+
 class ServerCharacterStateAndComponents:
 	var character_state: ServerCharacterState
 	var character_components: CharacterComponents
@@ -450,26 +488,6 @@ class ServerCharacterStateAndComponents:
 	) -> void:
 		self.character_state = current_physics_state
 		self.character_components = character_components
-
-class PerClientExportedData:
-	var client_tick: int
-	var physics_state: CharacterPhysicsState
-	var health_state: CharacterHealthState
-	var transform_state: CharacterTransformState
-	var character_entity_id: int
-
-	func _init(
-		client_tick: int,
-		physics_state: CharacterPhysicsState,
-		health_state: CharacterHealthState,
-		transform_state: CharacterTransformState,
-		character_entity_id: int
-	) -> void: 
-		self.client_tick = client_tick
-		self.physics_state = physics_state
-		self.health_state = health_state
-		self.transform_state = transform_state
-		self.character_entity_id = character_entity_id
 
 class EntityCreator:
 	const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
