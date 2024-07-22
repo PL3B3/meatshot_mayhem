@@ -702,6 +702,7 @@ transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 0, 1.2
 visible = false
 
 [node name="Gun" parent="SmootherBody" index="2"]
+transform = Transform3D(1.78814e-07, 0, 1, 0, 1, 0, -1, 0, 1.78814e-07, 0.745393, -0.32142, 0.707495)
 visible = false
 
 [node name="RightLeg" parent="." index="1"]
@@ -757,7 +758,7 @@ skeleton = NodePath("")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.69521e-09, 1.3, -0.0509631)
 
 [node name="BodyWaddlePivot" type="Node3D" parent="BodyPitchPivot" index="0"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0180133, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.00384851, 0)
 
 [node name="SmootherBody" type="MeshInstance3D" parent="BodyPitchPivot/BodyWaddlePivot" index="0"]
 transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0, 0)

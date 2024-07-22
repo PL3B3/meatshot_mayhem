@@ -124,7 +124,13 @@ func __run_game_simulation_tick() -> void:
 		var ability_result := own_character_components.ability_action().perform_ability(
 			current_camera_transform, remote_character_latest_position_per_entity_id)
 		own_character_components.first_person_display().play_fire_gun_animation()
-		hitscan_ability_results.append_array(ability_result.hitscan_results)
+		var gun_model_tracer_origin_position := (
+				own_character_components.first_person_display().get_tracer_origin_position())
+		var hitscan_results_updated_with_origin_at_gun_model: Array[HitscanResult] = []
+		for hitscan_result_originating_from_camera_origin: HitscanResult in ability_result.hitscan_results:
+			hitscan_results_updated_with_origin_at_gun_model.append(
+				hitscan_result_originating_from_camera_origin.with_origin(gun_model_tracer_origin_position))
+		hitscan_ability_results.append_array(hitscan_results_updated_with_origin_at_gun_model)
 	
 	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
 		own_character_physics_state.position(), 
@@ -181,7 +187,13 @@ func __perform_remote_character_abilities(
 					own_character_position,
 					latest_remote_character_state_per_entity_id,
 					character_entity_id_for_trigger))
-			remote_character_hitscan_ability_results.append_array(ability_result.hitscan_results)
+			var gun_model_tracer_origin_position := (
+				remote_character_components.third_person_display().get_tracer_origin_position())
+			var hitscan_results_updated_with_origin_at_gun_model: Array[HitscanResult] = []
+			for hitscan_result_originating_from_camera_origin: HitscanResult in ability_result.hitscan_results:
+				hitscan_results_updated_with_origin_at_gun_model.append(
+					hitscan_result_originating_from_camera_origin.with_origin(gun_model_tracer_origin_position))
+			remote_character_hitscan_ability_results.append_array(hitscan_results_updated_with_origin_at_gun_model)
 			remote_character_components.third_person_display().play_shoot_animation()
 		else:
 			unhandled_pending_triggers.push_back(pending_ability_trigger)
