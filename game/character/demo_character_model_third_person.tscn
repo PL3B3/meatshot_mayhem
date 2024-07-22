@@ -1,4 +1,4 @@
-[gd_scene load_steps=53 format=3 uid="uid://d2f1vujogd5mj"]
+[gd_scene load_steps=55 format=3 uid="uid://d2f1vujogd5mj"]
 
 [ext_resource type="PackedScene" uid="uid://dtwmihct47q8h" path="res://assets/DemoCharacterModel.glb" id="1_mj0y3"]
 [ext_resource type="AudioStream" uid="uid://b5a2uhl42fo7q" path="res://assets/step_0.ogg" id="2_aeroc"]
@@ -23,10 +23,10 @@ loop_mode = 1
 tracks/0/type = "position_3d"
 tracks/0/imported = false
 tracks/0/enabled = true
-tracks/0/path = NodePath("SmootherBody")
+tracks/0/path = NodePath("BodyPitchPivot/BodyWaddlePivot")
 tracks/0/interp = 1
 tracks/0/loop_wrap = true
-tracks/0/keys = PackedFloat32Array(0, 1, 0, 1.25, 0, 2, 1, 0, 1.27, 0, 4, 1, 0, 1.25, 0)
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, 0, 2, 1, 0, 0.02, 0, 4, 1, 0, 0, 0)
 
 [sub_resource type="AudioStreamRandomizer" id="AudioStreamRandomizer_jcds3"]
 random_pitch = 1.2
@@ -249,7 +249,7 @@ animation = &"blink"
 animation = &"gun_recoil"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_oi5bm"]
-animation = &"RESET"
+animation = &"idle_bob"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_u84x7"]
 animation = &"waddle"
@@ -272,6 +272,39 @@ nodes/output/position = Vector2(660, 100)
 nodes/waddle/node = SubResource("AnimationNodeAnimation_u84x7")
 nodes/waddle/position = Vector2(-120, 200)
 node_connections = [&"AddBlink", 1, &"Animation 4", &"AddShoot", 0, &"AddBlink", &"AddShoot", 1, &"gun_recoil", &"BlendIdleWalk", 0, &"idle_bob", &"BlendIdleWalk", 1, &"waddle", &"output", 0, &"BlendIdleWalk"]
+
+[sub_resource type="Animation" id="Animation_qbguy"]
+resource_name = "blink"
+length = 0.2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("BodyPitchPivot/BodyWaddlePivot/SmootherBody/Eye/EyeLidLower:rotation")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.122173), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("BodyPitchPivot/BodyWaddlePivot/SmootherBody/Eye/EyeLidUpper:rotation")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, -0.0872665), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_xcci3"]
+_data = {
+"blink": SubResource("Animation_qbguy")
+}
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_35hu6"]
 resource_name = "HipMaterial"
@@ -668,14 +701,8 @@ script = ExtResource("2_b6egu")
 transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 0, 1.25, 0)
 visible = false
 
-[node name="Shotgun" parent="SmootherBody" index="2" instance=ExtResource("3_ir71s")]
-transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 0.245575, -0.32142, 0.707495)
-
-[node name="Gun" parent="SmootherBody" index="3"]
+[node name="Gun" parent="SmootherBody" index="2"]
 visible = false
-
-[node name="ShootAudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="SmootherBody/Gun" index="0"]
-transform = Transform3D(-0.00824883, 0.0239426, 0.539947, 0.000630488, 0.54001, -0.0239358, -0.540477, 0.000264527, -0.00826866, 0.000669241, -0.029094, -0.0156993)
 
 [node name="RightLeg" parent="." index="1"]
 transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 0, 0.941211, -0.1)
@@ -700,8 +727,10 @@ parameters/AddBlink/add_amount = 1.0
 parameters/AddShoot/add_amount = 1.0
 parameters/BlendIdleWalk/blend_amount = 0.0
 
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." index="5"]
-volume_db = 10.0
+[node name="BlinkAnimationPlayer" type="AnimationPlayer" parent="." index="5"]
+libraries = {
+"": SubResource("AnimationLibrary_xcci3")
+}
 
 [node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="." index="6"]
 transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 0, 0.948773, 0)
@@ -728,9 +757,10 @@ skeleton = NodePath("")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.69521e-09, 1.3, -0.0509631)
 
 [node name="BodyWaddlePivot" type="Node3D" parent="BodyPitchPivot" index="0"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0180133, 0)
 
 [node name="SmootherBody" type="MeshInstance3D" parent="BodyPitchPivot/BodyWaddlePivot" index="0"]
-transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 8.25458e-09, -0.0525202, -0.0546676)
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0, 0)
 mesh = SubResource("ArrayMesh_dvga5")
 skeleton = NodePath("")
 
