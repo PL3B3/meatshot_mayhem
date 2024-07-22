@@ -7,7 +7,7 @@ cull_mode = 2
 shading_mode = 0
 disable_ambient_light = true
 disable_fog = true
-albedo_color = Color(0.803922, 0, 0.231373, 1)
+albedo_color = Color(0.937255, 0, 0.180392, 1)
 disable_receive_shadows = true
 
 [node name="TracerDisplayer" type="MeshInstance3D"]
