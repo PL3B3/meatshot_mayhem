@@ -14,3 +14,6 @@ func play_shoot_animation() -> void:
 func play_blink_animation() -> void:
 	blink_animation_player_.stop()
 	blink_animation_player_.play("blink")
+
+func get_tracer_origin_position() -> Vector3:
+	return shotgun_.get_tracer_origin_position()

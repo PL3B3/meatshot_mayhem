@@ -23,6 +23,9 @@ func display_character_transform(character_transform: CharacterTransformState) -
 func play_shoot_animation() -> void:
 	character_model.play_shoot_animation()
 
+func get_tracer_origin_position() -> Vector3:
+	return character_model.get_tracer_origin_position()
+
 func __compute_run_blend_ratio(next_position: Vector3) -> float:
 	var estimated_speed: float = (next_position - last_position).length() * TICKS_IN_A_SECOND
 	last_position = next_position

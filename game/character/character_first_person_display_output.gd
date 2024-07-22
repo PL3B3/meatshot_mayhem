@@ -21,3 +21,6 @@ func compute_camera_transform(character_transform: CharacterTransformState) -> T
 
 func play_fire_gun_animation() -> void:
 	shotgun_.play_first_person_shoot_animation()
+
+func get_tracer_origin_position() -> Vector3:
+	return shotgun_.get_tracer_origin_position()
