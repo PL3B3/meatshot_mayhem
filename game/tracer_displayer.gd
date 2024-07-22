@@ -2,8 +2,8 @@ extends MeshInstance3D
 class_name TracerDisplayer
 
 const TRACER_SPEED_UNITS_PER_SECOND: float = 600
-const TRACER_ORIGIN_POINT_THICKNESS: float = 0.05
-const TRACER_HIT_POINT_THICKNESS: float = 0.5
+const TRACER_ORIGIN_POINT_THICKNESS: float = 0.15
+const TRACER_HIT_POINT_THICKNESS: float = 1.5
 
 var immediate_mesh_: ImmediateMesh = ImmediateMesh.new()
 var active_tracers_: Array[Tracer] = []
