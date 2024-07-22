@@ -123,6 +123,7 @@ func __run_game_simulation_tick() -> void:
 			own_character_components.first_person_display().compute_camera_transform(own_character_transform_state))
 		var ability_result := own_character_components.ability_action().perform_ability(
 			current_camera_transform, remote_character_latest_position_per_entity_id)
+		own_character_components.first_person_display().play_fire_gun_animation()
 		hitscan_ability_results.append_array(ability_result.hitscan_results)
 	
 	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(

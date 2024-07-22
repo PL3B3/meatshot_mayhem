@@ -1,11 +1,96 @@
-[gd_scene load_steps=5 format=3 uid="uid://c8jh8ru1xis61"]
+[gd_scene load_steps=13 format=3 uid="uid://c8jh8ru1xis61"]
 
 [ext_resource type="Script" path="res://game/character/character_first_person_display_output.gd" id="1_3sshd"]
 [ext_resource type="Texture2D" uid="uid://b7g6q3dcwtppr" path="res://assets/crosshair.png" id="2_edoxe"]
 [ext_resource type="Texture2D" uid="uid://dx2ex6b2855uv" path="res://assets/overhang_fence_planks.png" id="3_gaw63"]
+[ext_resource type="AudioStream" uid="uid://bbmu10d0atafu" path="res://assets/shotgun_shot_bass.ogg" id="5_dv56f"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_74lvh"]
+load_path = "res://.godot/imported/DemoCharacterModel_GunTexture.png-58bbcc9d74afffb765181321789ecbaa.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2pral"]
+resource_name = "GunTexture"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_74lvh")
+metallic = 0.689119
+roughness = 0.779793
+texture_filter = 2
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_4gt36"]
+_surfaces = [{
+"aabb": AABB(-0.47722, -0.272588, -0.428231, 0.879343, 0.545177, 0.856463),
+"format": 34896613377,
+"index_count": 84,
+"index_data": PackedByteArray(1, 0, 5, 0, 2, 0, 1, 0, 4, 0, 5, 0, 1, 0, 3, 0, 4, 0, 1, 0, 0, 0, 3, 0, 3, 0, 5, 0, 4, 0, 5, 0, 9, 0, 8, 0, 5, 0, 3, 0, 9, 0, 5, 0, 7, 0, 2, 0, 5, 0, 8, 0, 7, 0, 1, 0, 6, 0, 0, 0, 6, 0, 2, 0, 7, 0, 6, 0, 1, 0, 2, 0, 3, 0, 6, 0, 9, 0, 3, 0, 0, 0, 6, 0, 11, 0, 15, 0, 14, 0, 11, 0, 12, 0, 15, 0, 11, 0, 13, 0, 10, 0, 11, 0, 14, 0, 13, 0, 15, 0, 13, 0, 14, 0, 13, 0, 8, 0, 9, 0, 13, 0, 15, 0, 8, 0, 15, 0, 7, 0, 8, 0, 15, 0, 12, 0, 7, 0, 6, 0, 11, 0, 10, 0, 11, 0, 7, 0, 12, 0, 11, 0, 6, 0, 7, 0, 13, 0, 6, 0, 10, 0, 13, 0, 9, 0, 6, 0),
+"name": "GunTexture",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 16,
+"vertex_data": PackedByteArray(0, 0, 165, 32, 121, 81, 0, 0, 0, 0, 255, 127, 199, 20, 0, 0, 0, 0, 89, 223, 121, 81, 0, 0, 255, 255, 0, 0, 121, 81, 0, 0, 255, 255, 255, 127, 0, 0, 0, 0, 255, 255, 255, 255, 121, 81, 0, 0, 0, 0, 186, 105, 255, 127, 0, 0, 0, 0, 68, 150, 255, 127, 0, 0, 255, 255, 233, 182, 255, 127, 0, 0, 255, 255, 21, 73, 255, 127, 0, 0, 0, 0, 165, 32, 133, 174, 0, 0, 0, 0, 255, 127, 55, 235, 0, 0, 0, 0, 89, 223, 133, 174, 0, 0, 255, 255, 0, 0, 133, 174, 0, 0, 255, 255, 255, 127, 255, 255, 0, 0, 255, 255, 255, 255, 133, 174, 0, 0)
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_duyqh"]
+resource_name = "DemoCharacterModel_Cube_003"
+_surfaces = [{
+"aabb": AABB(-0.47722, -0.272588, -0.428231, 0.879343, 0.545177, 0.856463),
+"attribute_data": PackedByteArray(170, 251, 86, 12, 255, 119, 120, 112, 255, 255, 133, 215, 170, 251, 137, 75, 255, 71, 120, 112, 255, 199, 120, 136, 83, 188, 137, 75, 255, 151, 120, 136, 255, 7, 133, 215, 255, 119, 255, 231, 255, 255, 255, 95, 255, 127, 255, 23, 255, 71, 255, 231, 255, 199, 255, 255, 255, 127, 255, 79, 255, 151, 255, 255, 255, 7, 255, 95, 255, 183, 255, 79, 30, 203, 86, 12, 19, 213, 133, 215, 19, 213, 133, 215, 83, 188, 24, 27, 202, 44, 133, 215, 202, 44, 133, 215, 104, 35, 255, 95, 104, 35, 255, 95, 255, 183, 6, 48, 5, 224, 255, 95, 5, 224, 255, 95, 248, 159, 255, 23, 170, 251, 86, 12, 255, 255, 133, 215, 255, 119, 120, 112, 170, 251, 137, 75, 255, 71, 120, 112, 255, 199, 120, 136, 83, 188, 137, 75, 255, 7, 133, 215, 255, 151, 120, 136, 255, 255, 255, 95, 255, 119, 255, 231, 255, 127, 255, 23, 255, 71, 255, 231, 255, 199, 255, 255, 255, 127, 255, 79, 255, 7, 255, 95, 255, 151, 255, 255, 255, 183, 255, 79),
+"format": 34896613399,
+"index_count": 84,
+"index_data": PackedByteArray(5, 0, 15, 0, 7, 0, 5, 0, 13, 0, 15, 0, 4, 0, 9, 0, 12, 0, 4, 0, 1, 0, 9, 0, 11, 0, 17, 0, 14, 0, 17, 0, 29, 0, 26, 0, 17, 0, 11, 0, 29, 0, 16, 0, 23, 0, 8, 0, 16, 0, 25, 0, 23, 0, 3, 0, 18, 0, 0, 0, 18, 0, 6, 0, 21, 0, 18, 0, 3, 0, 6, 0, 10, 0, 20, 0, 28, 0, 10, 0, 2, 0, 20, 0, 35, 0, 46, 0, 43, 0, 35, 0, 38, 0, 46, 0, 34, 0, 40, 0, 32, 0, 34, 0, 42, 0, 40, 0, 47, 0, 41, 0, 44, 0, 41, 0, 26, 0, 29, 0, 41, 0, 47, 0, 26, 0, 45, 0, 22, 0, 24, 0, 45, 0, 37, 0, 22, 0, 18, 0, 33, 0, 30, 0, 33, 0, 21, 0, 36, 0, 33, 0, 18, 0, 21, 0, 39, 0, 19, 0, 31, 0, 39, 0, 27, 0, 19, 0),
+"material": SubResource("StandardMaterial3D_2pral"),
+"name": "GunTexture",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 48,
+"vertex_data": PackedByteArray(0, 0, 165, 32, 121, 81, 170, 233, 0, 0, 165, 32, 121, 81, 33, 232, 0, 0, 165, 32, 121, 81, 210, 198, 0, 0, 255, 127, 199, 20, 170, 233, 0, 0, 255, 127, 199, 20, 33, 232, 0, 0, 255, 127, 199, 20, 55, 235, 0, 0, 89, 223, 121, 81, 170, 233, 0, 0, 89, 223, 121, 81, 55, 235, 0, 0, 89, 223, 121, 81, 50, 197, 255, 255, 0, 0, 121, 81, 33, 232, 255, 255, 0, 0, 121, 81, 210, 198, 255, 255, 0, 0, 121, 81, 170, 233, 255, 255, 255, 127, 0, 0, 33, 232, 255, 255, 255, 127, 0, 0, 55, 235, 255, 255, 255, 127, 0, 0, 170, 233, 255, 255, 255, 255, 121, 81, 55, 235, 255, 255, 255, 255, 121, 81, 50, 197, 255, 255, 255, 255, 121, 81, 170, 233, 0, 0, 186, 105, 255, 127, 2, 58, 0, 0, 186, 105, 255, 127, 221, 23, 0, 0, 186, 105, 255, 127, 210, 198, 0, 0, 68, 150, 255, 127, 2, 58, 0, 0, 68, 150, 255, 127, 199, 20, 0, 0, 68, 150, 255, 127, 50, 197, 255, 255, 233, 182, 255, 127, 199, 20, 255, 255, 233, 182, 255, 127, 50, 197, 255, 255, 233, 182, 255, 127, 2, 58, 255, 255, 21, 73, 255, 127, 221, 23, 255, 255, 21, 73, 255, 127, 210, 198, 255, 255, 21, 73, 255, 127, 2, 58, 0, 0, 165, 32, 133, 174, 2, 58, 0, 0, 165, 32, 133, 174, 221, 23, 0, 0, 165, 32, 133, 174, 44, 57, 0, 0, 255, 127, 55, 235, 2, 58, 0, 0, 255, 127, 55, 235, 44, 57, 0, 0, 255, 127, 55, 235, 204, 58, 0, 0, 89, 223, 133, 174, 2, 58, 0, 0, 89, 223, 133, 174, 199, 20, 0, 0, 89, 223, 133, 174, 204, 58, 255, 255, 0, 0, 133, 174, 221, 23, 255, 255, 0, 0, 133, 174, 44, 57, 255, 255, 0, 0, 133, 174, 2, 58, 255, 255, 255, 127, 255, 255, 44, 57, 255, 255, 255, 127, 255, 255, 204, 58, 255, 255, 255, 127, 255, 255, 2, 58, 255, 255, 255, 255, 133, 174, 199, 20, 255, 255, 255, 255, 133, 174, 204, 58, 255, 255, 255, 255, 133, 174, 2, 58, 250, 74, 245, 149, 66, 54, 250, 202, 61, 97, 32, 101, 250, 74, 245, 149, 66, 54, 250, 202, 48, 204, 4, 53, 250, 74, 245, 149, 48, 204, 4, 53, 54, 155, 37, 159, 66, 54, 250, 202, 61, 97, 32, 101, 246, 21, 4, 53, 66, 54, 250, 202, 48, 204, 4, 53, 246, 21, 4, 53, 48, 204, 4, 53, 54, 155, 37, 159, 246, 21, 4, 53, 0, 99, 0, 198, 66, 54, 250, 202, 61, 97, 32, 101, 0, 99, 0, 198, 48, 204, 4, 53, 54, 155, 37, 159, 48, 204, 4, 53, 54, 155, 37, 159, 1, 70, 255, 28, 66, 54, 250, 202, 61, 97, 32, 101, 1, 70, 255, 28, 0, 99, 0, 198, 66, 54, 250, 202, 61, 97, 32, 101, 0, 99, 0, 198, 61, 97, 32, 101, 54, 155, 37, 159, 0, 99, 0, 198, 48, 204, 4, 53, 54, 155, 37, 159, 66, 54, 250, 202, 61, 97, 32, 101, 1, 70, 255, 28, 61, 97, 32, 101, 54, 155, 37, 159, 1, 70, 255, 28, 48, 204, 4, 53, 54, 155, 37, 159, 1, 70, 255, 28)
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_4gt36")
 
 [sub_resource type="LabelSettings" id="LabelSettings_liqop"]
 font_size = 100
+
+[sub_resource type="Animation" id="Animation_ol8np"]
+resource_name = "gun_recoil"
+tracks/0/type = "position_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Camera3D/Gun")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0.185, -0.333, -0.287, 0.01, 1, 0.185, -0.333, 0, 0.5, 1, 0.185, -0.333, -0.287)
+tracks/1/type = "audio"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("AudioStreamPlayer")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"clips": [{
+"end_offset": 0.0,
+"start_offset": 0.0,
+"stream": ExtResource("5_dv56f")
+}],
+"times": PackedFloat32Array(0)
+}
+tracks/1/use_blend = true
+
+[sub_resource type="Animation" id="Animation_i2uup"]
+resource_name = "RESET"
+tracks/0/type = "position_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Camera3D/Gun")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0.185, -0.333, -0.287)
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_mei7r"]
+_data = {
+"RESET": SubResource("Animation_i2uup"),
+"gun_recoil": SubResource("Animation_ol8np")
+}
 
 [node name="CharacterFirstPersonDisplayOutput" type="Node3D"]
 top_level = true
@@ -14,6 +99,12 @@ script = ExtResource("1_3sshd")
 [node name="Camera3D" type="Camera3D" parent="."]
 current = true
 fov = 90.0
+
+[node name="Gun" type="MeshInstance3D" parent="Camera3D"]
+transform = Transform3D(-1.09278e-08, 0, 0.25, 0, 0.25, 0, -0.25, 0, -1.09278e-08, 0.185, -0.333, -0.287)
+cast_shadow = 0
+mesh = SubResource("ArrayMesh_duyqh")
+skeleton = NodePath("")
 
 [node name="HealthLabel" type="Label" parent="."]
 offset_right = 288.0
@@ -60,3 +151,11 @@ text = "YOU ARE DEAD"
 label_settings = SubResource("LabelSettings_liqop")
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="GunRecoilAnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_mei7r")
+}
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+max_polyphony = 2

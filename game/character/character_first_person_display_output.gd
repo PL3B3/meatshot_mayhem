@@ -6,6 +6,7 @@ const CAMERA_OFFSET_FROM_CHARACTER_ORIGIN = Vector3(0, 0.75, 0)
 
 @onready var camera_: Camera3D = $Camera3D
 @onready var health_label_: Label = $HealthLabel
+@onready var gun_animation_player_: AnimationPlayer = $GunRecoilAnimationPlayer
 
 func display_character_state(character_transform: CharacterTransformState, health: int) -> void:
 	camera_.transform = compute_camera_transform(character_transform)
@@ -17,3 +18,7 @@ func compute_camera_transform(character_transform: CharacterTransformState) -> T
 		deg_to_rad(character_transform.pitch()), deg_to_rad(character_transform.yaw()), 0)
 	var mouse_look_rotation_basis := Basis.from_euler(mouse_look_rotation_in_euler_angles)
 	return Transform3D(mouse_look_rotation_basis, camera_position)
+
+func play_fire_gun_animation() -> void:
+	gun_animation_player_.stop()
+	gun_animation_player_.play("gun_recoil")
