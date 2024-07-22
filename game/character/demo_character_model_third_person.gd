@@ -1,0 +1,11 @@
+class_name DemoCharacterThirdPersonModel extends Node3D
+
+@onready var animation_tree_: AnimationTree = $AnimationTree
+@onready var shotgun_: Shotgun = $BodyPitchPivot/BodyWaddlePivot/SmootherBody/Shotgun
+
+func display_character_state(pitch_deg: float, speed: float) -> void:
+	$BodyPitchPivot.rotation_degrees.x = pitch_deg
+	animation_tree_.set("parameters/BlendIdleWalk/blend_amount", clampf(speed, 0, 1))
+
+func play_shoot_animation() -> void:
+	shotgun_.play_third_person_shoot_animation()

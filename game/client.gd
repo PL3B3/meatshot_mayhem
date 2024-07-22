@@ -182,6 +182,7 @@ func __perform_remote_character_abilities(
 					latest_remote_character_state_per_entity_id,
 					character_entity_id_for_trigger))
 			remote_character_hitscan_ability_results.append_array(ability_result.hitscan_results)
+			remote_character_components.third_person_display().play_shoot_animation()
 		else:
 			unhandled_pending_triggers.push_back(pending_ability_trigger)
 	pending_remote_character_triggers_ = unhandled_pending_triggers

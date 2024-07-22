@@ -80,7 +80,7 @@ tracks/0/enabled = true
 tracks/0/path = NodePath("GunModel")
 tracks/0/interp = 1
 tracks/0/loop_wrap = true
-tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, -0.5, 0.01, 1, 0, 0, 0, 0.3, 1, 0, 0, -0.5)
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, -0.5, 0.01, 1, 0, 0, 0.2, 0.4, 1, 0, 0, -0.5)
 tracks/1/type = "audio"
 tracks/1/imported = false
 tracks/1/enabled = true
@@ -118,5 +118,6 @@ libraries = {
 }
 
 [node name="ShootAudioPlayer3D" type="AudioStreamPlayer3D" parent="."]
+unit_size = 20.0
 
 [node name="ShootAudioPlayer" type="AudioStreamPlayer" parent="."]
