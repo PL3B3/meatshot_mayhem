@@ -28,10 +28,10 @@ func notify_client_of_respawn(client_id: int) -> void:
 	__handle_respawn.rpc_id(client_id)
 
 func send_state_snapshot_to_client(client_id: int, tick: int, snapshot: ServerToClientStateSnapshotMessage) -> void:
-	__handle_message_from_server.rpc_id(client_id, tick, snapshot.to_dict())
+	s2c.rpc_id(client_id, tick, snapshot.to_dict())
 
 func send_inputs_to_server(input_messages: Array[Dictionary]) -> void:
-	__handle_message_from_client.rpc_id(SERVER_NETWORK_ID, { "inputs": input_messages })
+	c2s.rpc_id(SERVER_NETWORK_ID, { "inputs": input_messages })
 
 func trigger_remote_character_ability(
 	remote_character_entity_id: int,
@@ -50,14 +50,16 @@ func quit_to_client_menu() -> void:
 	multiplayer.multiplayer_peer.disconnect_peer(1)
 	get_tree().change_scene_to_file("res://game/main.tscn")
 
+# Name is shortened to make the RPC packet size smaller
 @rpc("any_peer", "call_remote", "unreliable")
-func __handle_message_from_client(serialized_inputs: Dictionary) -> void:
+func c2s(serialized_inputs: Dictionary) -> void:
 	for serialized_input: Dictionary in serialized_inputs["inputs"]:
 		var client_message := ClientToServerInputMessage.from_dict(serialized_input)
 		received_client_input.emit(multiplayer.get_remote_sender_id(), client_message)
 
+# Name is shortened to make the RPC packet size smaller
 @rpc("authority", "call_remote", "unreliable")
-func __handle_message_from_server(state_snapshot_server_tick: int, serialized_state_snapshot: Dictionary) -> void:
+func s2c(state_snapshot_server_tick: int, serialized_state_snapshot: Dictionary) -> void:
 	var deserialized_state_snapshot := ServerToClientStateSnapshotMessage.from_dict(serialized_state_snapshot)
 	received_authoritative_state_snapshot.emit(state_snapshot_server_tick, deserialized_state_snapshot)
 
