@@ -41,6 +41,7 @@ func __try_start_server() -> bool:
 	var create_server_result_status := server_multiplayer_peer.create_server(Network.PORT)
 	if create_server_result_status == OK: 
 		multiplayer.multiplayer_peer = server_multiplayer_peer
+		server_multiplayer_peer.host.compress(ENetConnection.COMPRESS_ZLIB)
 		__connection_status_label.text = "SUCCESSFULLY STARTED SERVER"
 		get_tree().change_scene_to_file("res://game/server.tscn")
 		return true
@@ -60,6 +61,7 @@ func __try_start_client() -> bool:
 	var connect_client_result_status := client_multiplayer_peer.create_client(server_ip, Network.PORT)
 	if connect_client_result_status == OK: 
 		multiplayer.multiplayer_peer = client_multiplayer_peer
+		client_multiplayer_peer.host.compress(ENetConnection.COMPRESS_ZLIB)
 		var connected_latch := TimeoutLatch.new(multiplayer.connected_to_server, get_tree(), CLIENT_CONNECT_TIMEOUT)
 		var connected_successfully := await connected_latch.complete_or_timeout()
 		if connected_successfully:
