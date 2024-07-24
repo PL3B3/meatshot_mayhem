@@ -24,13 +24,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
-func latest_input() -> InputState:
+func latest_input(client_tick: int) -> InputState:
 	return InputState.new(
 		__yaw_deg,
 		__pitch_deg,
 		Input.is_action_pressed("jump"),
 		Input.is_action_pressed("slow"),
-		Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+		Input.get_vector("move_left", "move_right", "move_forward", "move_backward"),
+		client_tick
 	)
 
 func reset_view_angle() -> void:

@@ -9,6 +9,7 @@ const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
 const MAXIMUM_TIMES_TO_RETURN_LAST_VALID_INPUT := 5
 const NO_MOVE_DIRECTION := Vector2.ZERO
 const DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT := -1
+const NO_CLIENT_RECONCILIATION_FOR_EXTRAPOLATED_INPUT := Network.NO_TICK
 static var DEFAULT_CLIENT_INPUT := ClientInput.new(
 	InputState.DEFAULT, 
 	EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY, 
@@ -115,7 +116,8 @@ static func __create_default_input_state_with_last_known_view_angle(last_valid_i
 		last_valid_input.input_state().pitch(),
 		DO_NOT_RETRIGGER_JUMP_IN_EXTRAPOLATED_INPUT,
 		STANDING_STILL_INPUT_DOES_NOT_SLOW_WALK,
-		NO_MOVE_DIRECTION)
+		NO_MOVE_DIRECTION,
+		NO_CLIENT_RECONCILIATION_FOR_EXTRAPOLATED_INPUT)
 	return ClientInput.new(
 		input_state_standing_still_with_last_known_view_angle, 
 		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY,
@@ -128,7 +130,8 @@ static func __copy_last_valid_client_input_without_triggers(client_input: Client
 		input_state_to_copy.pitch(),
 		DO_NOT_RETRIGGER_JUMP_IN_EXTRAPOLATED_INPUT,
 		input_state_to_copy.is_slow_walking(),
-		input_state_to_copy.direction())
+		input_state_to_copy.direction(),
+		NO_CLIENT_RECONCILIATION_FOR_EXTRAPOLATED_INPUT)
 	return ClientInput.new(
 		copied_input_without_triggers, 
 		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY,

@@ -73,7 +73,8 @@ func _physics_process(_delta: float) -> void:
 func __run_game_simulation_tick() -> void:
 	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
 	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
-	var latest_input: InputState = input_handler_.latest_input()
+	var client_simulation_tick := client_state_timeline_.get_next_tick()
+	var latest_input: InputState = input_handler_.latest_input(client_simulation_tick)
 	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state().physics_state()
 	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
 		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
@@ -150,9 +151,8 @@ func __run_game_simulation_tick() -> void:
 		next_own_character_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
 	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
-	var tick_for_state_computed_using_latest_input = client_state_timeline_.get_current_tick()
 	var input_message_to_export := ClientToServerInputMessage.new(
-		tick_for_state_computed_using_latest_input, 
+		client_simulation_tick, 
 		ClientInput.new(
 			latest_input, 
 			ability_trigger_result.is_triggered, 
