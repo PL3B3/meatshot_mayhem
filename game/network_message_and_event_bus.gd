@@ -3,6 +3,7 @@ class_name NetworkMessageAndEventBus extends Node
 const SERVER_NETWORK_ID = 1
 
 signal received_authoritative_state_snapshot(server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
+signal received_client_trigger(client_id: int, camera_transform: Transform3D, server_tick_displayed_on_client: int)
 signal received_client_input(client_id: int, message: ClientInput)
 signal triggered_remote_character_ability(
 	remote_character_entity_id: int, 
@@ -30,8 +31,12 @@ func notify_client_of_respawn(client_id: int) -> void:
 func send_state_snapshot_to_client(client_id: int, tick: int, snapshot: ServerToClientStateSnapshotMessage) -> void:
 	s2c.rpc_id(client_id, tick, snapshot.to_dict())
 
-func send_inputs_to_server(input_messages: Array[Dictionary]) -> void:
-	c2s.rpc_id(SERVER_NETWORK_ID, { "inputs": input_messages })
+# Raw generic Array is used instead of Array[Dictionary] due to a strange static typing issue with RPCs
+func send_inputs_to_server(input_messages: Array) -> void:
+	c2s.rpc_id(SERVER_NETWORK_ID, input_messages)
+
+func send_trigger_to_server(camera_transform: Transform3D, server_tick_displayed: int) -> void:
+	ct2s.rpc_id(SERVER_NETWORK_ID, camera_transform, server_tick_displayed)
 
 func trigger_remote_character_ability(
 	remote_character_entity_id: int,
@@ -52,10 +57,15 @@ func quit_to_client_menu() -> void:
 
 # Name is shortened to make the RPC packet size smaller
 @rpc("any_peer", "call_remote", "unreliable")
-func c2s(serialized_inputs: Dictionary) -> void:
-	for serialized_input: Dictionary in serialized_inputs["inputs"]:
+func c2s(serialized_inputs: Array) -> void:
+	for serialized_input: Dictionary in serialized_inputs:
 		var client_message := ClientInput.from_dict(serialized_input)
 		received_client_input.emit(multiplayer.get_remote_sender_id(), client_message)
+
+# Name is shortened to make the RPC packet size smaller
+@rpc("any_peer", "call_remote", "reliable")
+func ct2s(camera_transform: Transform3D, server_tick_displayed: int) -> void:
+	received_client_trigger.emit(multiplayer.get_remote_sender_id(), camera_transform, server_tick_displayed)
 
 # Name is shortened to make the RPC packet size smaller
 @rpc("authority", "call_remote", "unreliable")

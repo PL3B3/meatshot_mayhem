@@ -132,6 +132,7 @@ func __run_game_simulation_tick() -> void:
 			hitscan_results_updated_with_origin_at_gun_model.append(
 				hitscan_result_originating_from_camera_origin.with_origin(gun_model_tracer_origin_position))
 		hitscan_ability_results.append_array(hitscan_results_updated_with_origin_at_gun_model)
+		network_bus_.send_trigger_to_server(current_camera_transform, interpolated_remote_entity_states.tick())
 	
 	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
 		own_character_physics_state.position(), 
