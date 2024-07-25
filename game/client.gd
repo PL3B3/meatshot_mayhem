@@ -27,7 +27,7 @@ var network_bus_: NetworkMessageAndEventBus
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_remote_state_buffer_: OrderedStateSnapshotBuffer
 var pending_remote_character_triggers_: Array[RemoteCharacterAbilityTrigger] = []
-var recent_client_to_server_inputs_: Array[Dictionary] = []
+var recent_client_to_server_inputs_: Array[PackedByteArray] = []
 var latest_reconciliation_data_: Optional = Optional.empty()
 var latest_authoritative_health_state: CharacterHealthState = null
 var latest_interpolated_remote_entity_snapshot := NO_REMOTE_CHARACTER_STATES
@@ -152,7 +152,7 @@ func __run_game_simulation_tick() -> void:
 		next_own_character_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
 	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
-	__send_recent_inputs_to_server(latest_input.to_dict())
+	__send_recent_inputs_to_server(latest_input)
 
 func __should_run_game_simulation() -> bool:
 	return (
@@ -293,8 +293,8 @@ func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 			simulated_state.velocity(), RECONCILIATION_VELOCITY_CORRECTION_LINEAR_FRACTION)
 		return CharacterPhysicsState.new(corrected_position, corrected_velocity, simulated_state.is_grounded())
 
-func __send_recent_inputs_to_server(latest_message: Dictionary) -> void:
-	recent_client_to_server_inputs_.push_back(latest_message)
+func __send_recent_inputs_to_server(latest_input_state: InputState) -> void:
+	recent_client_to_server_inputs_.push_back(latest_input_state.serialize())
 	while recent_client_to_server_inputs_.size() > 1 + NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER:
 		recent_client_to_server_inputs_.pop_front()
 	network_bus_.send_inputs_to_server(recent_client_to_server_inputs_)
