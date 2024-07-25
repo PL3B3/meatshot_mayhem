@@ -3,7 +3,7 @@ class_name NetworkMessageAndEventBus extends Node
 const SERVER_NETWORK_ID = 1
 
 signal received_authoritative_state_snapshot(server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
-signal received_client_input(client_id: int, message: ClientToServerInputMessage)
+signal received_client_input(client_id: int, message: ClientInput)
 signal triggered_remote_character_ability(
 	remote_character_entity_id: int, 
 	camera_transform: Transform3D,  
@@ -54,7 +54,7 @@ func quit_to_client_menu() -> void:
 @rpc("any_peer", "call_remote", "unreliable")
 func c2s(serialized_inputs: Dictionary) -> void:
 	for serialized_input: Dictionary in serialized_inputs["inputs"]:
-		var client_message := ClientToServerInputMessage.from_dict(serialized_input)
+		var client_message := ClientInput.from_dict(serialized_input)
 		received_client_input.emit(multiplayer.get_remote_sender_id(), client_message)
 
 # Name is shortened to make the RPC packet size smaller
