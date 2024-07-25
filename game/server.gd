@@ -360,19 +360,19 @@ class InputSubscriptionsForActiveClients:
 			latest_input_per_client[client_id] = client_input_source.pop_latest_input_state_and_triggers()
 		return latest_input_per_client
 
-class InputBufferAndPendingTriggers:
-	var input_buffer: OrderedInputBuffer
-	var pending_triggers: Array[InputTrigger]
+	class InputBufferAndPendingTriggers:
+		var input_buffer: OrderedInputBuffer
+		var pending_triggers: Array[InputTrigger]
 
-	func _init(input_buffer: OrderedInputBuffer, pending_triggers: Array[InputTrigger]) -> void:
-		self.input_buffer = input_buffer
-		self.pending_triggers = pending_triggers
-	
-	func pop_latest_input_state_and_triggers() -> InputStateAndTriggers:
-		var latest_input_state := input_buffer.pop()
-		var triggers_to_return := pending_triggers.duplicate()
-		pending_triggers.clear()
-		return InputStateAndTriggers.new(latest_input_state, triggers_to_return)
+		func _init(input_buffer: OrderedInputBuffer, pending_triggers: Array[InputTrigger]) -> void:
+			self.input_buffer = input_buffer
+			self.pending_triggers = pending_triggers
+		
+		func pop_latest_input_state_and_triggers() -> InputStateAndTriggers:
+			var latest_input_state := input_buffer.pop()
+			var triggers_to_return := pending_triggers.duplicate()
+			pending_triggers.clear()
+			return InputStateAndTriggers.new(latest_input_state, triggers_to_return)
 
 class InputStateAndTriggers:
 	var input_state: InputState
