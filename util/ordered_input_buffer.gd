@@ -5,15 +5,9 @@ const VALID := true
 const IS_LOGGING_ENABLED := false
 const DO_NOT_RETRIGGER_JUMP_IN_EXTRAPOLATED_INPUT := false
 const STANDING_STILL_INPUT_DOES_NOT_SLOW_WALK := false
-const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
 const MAXIMUM_TIMES_TO_RETURN_LAST_VALID_INPUT := 5
 const NO_MOVE_DIRECTION := Vector2.ZERO
-const DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT := -1
 const NO_CLIENT_RECONCILIATION_FOR_EXTRAPOLATED_INPUT := Network.NO_TICK
-static var DEFAULT_CLIENT_INPUT := ClientInput.new(
-	InputState.DEFAULT, 
-	EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY, 
-	DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT)
 
 var target_size_: int
 var max_size_: int
@@ -26,7 +20,7 @@ var queue_name_: String
 var latest_popped_tick_: int = -1
 var is_buffering_: bool = true
 var ticks_in_a_row_returned_last_valid_input_ := 0
-var last_valid_input_: ClientInput = DEFAULT_CLIENT_INPUT
+var last_valid_input_: InputState = InputState.DEFAULT
 
 func _init(
 	queue_name: String,
@@ -41,13 +35,13 @@ func _init(
 	target_size_ = target_size
 	max_size_ = max_size
 
-func push(client_input: ClientInput) -> void:
+func push(input_state: InputState) -> void:
 	queue_size_at_push_stat_.add_sample(input_buffer_.size())
-	var value_wrapped_as_queue_item := QueuedInput.new(client_input, VALID)
+	var value_wrapped_as_queue_item := QueuedInput.new(input_state, VALID)
 	__shrink_queue_if_over_max_size()
 	__insert_item_in_order(value_wrapped_as_queue_item)
 
-func pop() -> ClientInput:
+func pop() -> InputState:
 	queue_size_at_pop_stat_.add_sample(input_buffer_.size())
 	__enable_buffering_if_empty()
 	if __check_if_still_buffering():
@@ -99,43 +93,34 @@ func __insert_item_in_order(queued_input: QueuedInput) -> void:
 func __append_item_with_highest_tick_to_end_of_buffer(queued_input: QueuedInput) -> void:
 	input_buffer_.push_back(queued_input)
 
-func __extrapolate_input_to_return_when_buffer_empty() -> ClientInput:
-	var input_to_return: ClientInput
+func __extrapolate_input_to_return_when_buffer_empty() -> InputState:
+	var input_to_return: InputState
 	if ticks_in_a_row_returned_last_valid_input_ < MAXIMUM_TIMES_TO_RETURN_LAST_VALID_INPUT:
 		ticks_in_a_row_returned_last_valid_input_ += 1
-		input_to_return = __copy_last_valid_client_input_without_triggers(last_valid_input_)
+		input_to_return = __copy_last_valid_input_state_without_triggers(last_valid_input_)
 		__log("Using last valid input as placeholder: %s", [input_to_return])
 	else:
 		input_to_return = __create_default_input_state_with_last_known_view_angle(last_valid_input_)
 		__log("Using default input as placeholder: %s", [input_to_return])
 	return input_to_return
 
-static func __create_default_input_state_with_last_known_view_angle(last_valid_input: ClientInput) -> ClientInput:
-	var input_state_standing_still_with_last_known_view_angle := InputState.new(
-		last_valid_input.input_state().yaw(),
-		last_valid_input.input_state().pitch(),
+static func __create_default_input_state_with_last_known_view_angle(last_valid_input: InputState) -> InputState:
+	return InputState.new(
+		last_valid_input.yaw(),
+		last_valid_input.pitch(),
 		DO_NOT_RETRIGGER_JUMP_IN_EXTRAPOLATED_INPUT,
 		STANDING_STILL_INPUT_DOES_NOT_SLOW_WALK,
 		NO_MOVE_DIRECTION,
 		NO_CLIENT_RECONCILIATION_FOR_EXTRAPOLATED_INPUT)
-	return ClientInput.new(
-		input_state_standing_still_with_last_known_view_angle, 
-		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY,
-		DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT)
 
-static func __copy_last_valid_client_input_without_triggers(client_input: ClientInput) -> ClientInput:
-	var input_state_to_copy := client_input.input_state()
-	var copied_input_without_triggers := InputState.new(
+static func __copy_last_valid_input_state_without_triggers(input_state_to_copy: InputState) -> InputState:
+	return InputState.new(
 		input_state_to_copy.yaw(),
 		input_state_to_copy.pitch(),
 		DO_NOT_RETRIGGER_JUMP_IN_EXTRAPOLATED_INPUT,
 		input_state_to_copy.is_slow_walking(),
 		input_state_to_copy.direction(),
 		NO_CLIENT_RECONCILIATION_FOR_EXTRAPOLATED_INPUT)
-	return ClientInput.new(
-		copied_input_without_triggers, 
-		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY,
-		DISPLAYED_TICK_IRRELEVANT_FOR_EXTRAPOLATED_INPUT)
 
 func __log(format_string: String, args: Array[Variant] = []) -> void:
 	if IS_LOGGING_ENABLED:
@@ -143,12 +128,12 @@ func __log(format_string: String, args: Array[Variant] = []) -> void:
 		print("%s :: %s" % [queue_name_, log_message])
 
 class QueuedInput:
-	var value: ClientInput
+	var value: InputState
 	var is_valid: bool
 
-	func _init(value: ClientInput, is_valid: bool) -> void:
+	func _init(value: InputState, is_valid: bool) -> void:
 		self.value = value
 		self.is_valid = is_valid
 	
 	func tick() -> int:
-		return value.input_state().client_tick()
+		return value.client_tick()
