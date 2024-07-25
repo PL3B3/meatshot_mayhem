@@ -3,7 +3,7 @@ class_name Server
 
 @onready var map_spawner: MultiplayerSpawner = $MapSpawner
 @onready var entity_spawner_: EntitySpawner = $EntitySpawner
-@onready var client_session_dispatcher_ := ActiveClientSessions.new()
+@onready var client_input_subscribers_ := InputSubscriptionsForActiveClients.new()
 
 var game_simulation_: ServerGameSimulation
 var network_message_bus_: NetworkMessageAndEventBus
@@ -14,15 +14,15 @@ func _ready() -> void:
 	game_simulation_ = ServerGameSimulation.new(entity_spawner_, network_message_bus_)
 	game_simulation_.simulation_state_advanced.connect(authoritative_state_exporter_.export_state_snapshots_to_clients)
 	authoritative_state_exporter_.export_state_snapshot.connect(network_message_bus_.send_state_snapshot_to_client)
-	network_message_bus_.received_client_trigger.connect(client_session_dispatcher_.dispatch_input_trigger)
-	network_message_bus_.received_client_input.connect(client_session_dispatcher_.dispatch_input_message)
-	network_message_bus_.client_disconnected.connect(client_session_dispatcher_.remove_client_session)
-	network_message_bus_.client_connected.connect(client_session_dispatcher_.add_new_client_session)
+	network_message_bus_.received_client_trigger.connect(client_input_subscribers_.dispatch_input_trigger)
+	network_message_bus_.received_client_input.connect(client_input_subscribers_.dispatch_input_message)
+	network_message_bus_.client_disconnected.connect(client_input_subscribers_.remove_client_session)
+	network_message_bus_.client_connected.connect(client_input_subscribers_.add_new_client_session)
 	add_child(network_message_bus_)
 	map_spawner.spawn(null)
 
 func _physics_process(_delta: float) -> void:
-	var latest_input_per_connected_client_id := client_session_dispatcher_.get_latest_input_per_connected_client_id()
+	var latest_input_per_connected_client_id := client_input_subscribers_.get_latest_input_per_connected_client_id()
 	game_simulation_.advance_simulation(latest_input_per_connected_client_id)
 
 class ServerGameSimulation:
@@ -334,23 +334,23 @@ class ServerGameSimulation:
 				player_life_death_state_per_client_id.duplicate(true), 
 				character_state_per_client_id.duplicate(true))
 
-class ActiveClientSessions:
+class InputSubscriptionsForActiveClients:
 	static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputBuffer: 
 		return OrderedInputBuffer.new("sv_input_buf[%10d]" % x)
 	
-	var active_session_per_client_id_ := {}
+	var input_source_per_active_client_id_ := {}
 
 	func add_new_client_session(client_id: int) -> void:
 		var input_buffer_for_client: OrderedInputBuffer = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
-		active_session_per_client_id_[client_id] = InputBufferAndPendingTriggers.new(input_buffer_for_client, [])
+		input_source_per_active_client_id_[client_id] = InputBufferAndPendingTriggers.new(input_buffer_for_client, [])
 
 	func remove_client_session(client_id: int) -> void:
-		active_session_per_client_id_.erase(client_id)
+		input_source_per_active_client_id_.erase(client_id)
 
 	func dispatch_input_message(client_id: int, input: ClientInput) -> void:
-		if client_id in active_session_per_client_id_:
-			var active_client_session: InputBufferAndPendingTriggers = active_session_per_client_id_[client_id]
-			var input_buffer_for_client := active_client_session.input_buffer
+		if client_id in input_source_per_active_client_id_:
+			var client_input_source: InputBufferAndPendingTriggers = input_source_per_active_client_id_[client_id]
+			var input_buffer_for_client := client_input_source.input_buffer
 			input_buffer_for_client.push(input)
 		else:
 			print("Cannot enqueue input %s from client %d. No input buffer initialized." % [input, client_id])
@@ -360,18 +360,18 @@ class ActiveClientSessions:
 		camera_transform: Transform3D, 
 		server_tick_displayed_on_client: int
 	) -> void:
-		if client_id in active_session_per_client_id_:
-			var active_client_session: InputBufferAndPendingTriggers = active_session_per_client_id_[client_id]
-			var pending_triggers_for_client := active_client_session.pending_triggers
+		if client_id in input_source_per_active_client_id_:
+			var client_input_source: InputBufferAndPendingTriggers = input_source_per_active_client_id_[client_id]
+			var pending_triggers_for_client := client_input_source.pending_triggers
 			pending_triggers_for_client.append(InputTrigger.new(server_tick_displayed_on_client, camera_transform))
 		else:
 			print("Cannot enqueue trigger from client %d. No input tracker active." % client_id)
 
 	func get_latest_input_per_connected_client_id() -> Dictionary:
 		var latest_input_per_client := {}
-		for client_id: int in active_session_per_client_id_:
-			var active_client_session: InputBufferAndPendingTriggers = active_session_per_client_id_[client_id]
-			latest_input_per_client[client_id] = active_client_session.pop_latest_input_state_and_triggers()
+		for client_id: int in input_source_per_active_client_id_:
+			var client_input_source: InputBufferAndPendingTriggers = input_source_per_active_client_id_[client_id]
+			latest_input_per_client[client_id] = client_input_source.pop_latest_input_state_and_triggers()
 		return latest_input_per_client
 
 class InputBufferAndPendingTriggers:
