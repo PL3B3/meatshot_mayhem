@@ -374,22 +374,6 @@ class InputSubscriptionsForActiveClients:
 			pending_triggers.clear()
 			return InputStateAndTriggers.new(latest_input_state, triggers_to_return)
 
-class InputStateAndTriggers:
-	var input_state: InputState
-	var input_triggers: Array[InputTrigger]
-
-	func _init(input_state: InputState, input_triggers: Array[InputTrigger]) -> void:
-		self.input_state = input_state
-		self.input_triggers = input_triggers
-
-class InputTrigger:
-	var server_tick_displayed_on_client: int
-	var camera_transform: Transform3D
-
-	func _init(server_tick_displayed_on_client: int, camera_transform: Transform3D) -> void:
-		self.server_tick_displayed_on_client = server_tick_displayed_on_client
-		self.camera_transform = camera_transform
-
 class ServerToClientStateSnapshotExporter:
 	signal export_state_snapshot(client_id: int, server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
 
@@ -518,3 +502,19 @@ class ServerCharacterState:
 			character_entity_id,
 			input
 		]
+
+class InputStateAndTriggers:
+	var input_state: InputState
+	var input_triggers: Array[InputTrigger]
+
+	func _init(input_state: InputState, input_triggers: Array[InputTrigger]) -> void:
+		self.input_state = input_state
+		self.input_triggers = input_triggers
+
+class InputTrigger:
+	var server_tick_displayed_on_client: int
+	var camera_transform: Transform3D
+
+	func _init(server_tick_displayed_on_client: int, camera_transform: Transform3D) -> void:
+		self.server_tick_displayed_on_client = server_tick_displayed_on_client
+		self.camera_transform = camera_transform
