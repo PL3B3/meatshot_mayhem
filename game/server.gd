@@ -14,6 +14,7 @@ func _ready() -> void:
 	game_simulation_ = ServerGameSimulation.new(entity_spawner_, network_message_bus_)
 	game_simulation_.simulation_state_advanced.connect(authoritative_state_exporter_.export_state_snapshots_to_clients)
 	authoritative_state_exporter_.export_state_snapshot.connect(network_message_bus_.send_state_snapshot_to_client)
+	network_message_bus_.received_client_trigger.connect(client_session_dispatcher_.dispatch_input_trigger)
 	network_message_bus_.received_client_input.connect(client_session_dispatcher_.dispatch_input_message)
 	network_message_bus_.client_disconnected.connect(client_session_dispatcher_.remove_client_session)
 	network_message_bus_.client_connected.connect(client_session_dispatcher_.add_new_client_session)
@@ -45,7 +46,7 @@ class ServerGameSimulation:
 			CharacterHealthState.DEFAULT_HEALTH_STATE,
 			Network.NO_TICK,
 			ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP,
-			DEFAULT_CLIENT_INPUT)
+			InputStateAndTriggers.new(DEFAULT_CLIENT_INPUT, []))
 
 	var entity_spawner_: EntitySpawner
 	var network_message_bus_: NetworkMessageAndEventBus
@@ -151,7 +152,7 @@ class ServerGameSimulation:
 		for client_id_for_existing_character: int in simulation_state_.character_state_per_client_id:
 			var character_state: ServerCharacterState = (
 				simulation_state_.character_state_per_client_id[client_id_for_existing_character])
-			var latest_client_input: ClientInput = (
+			var latest_client_input: InputStateAndTriggers = (
 				latest_input_per_connected_client_id[client_id_for_existing_character])
 			simulation_state_.character_state_per_client_id[client_id_for_existing_character] = (
 				character_state.with_input(latest_client_input))
@@ -175,9 +176,9 @@ class ServerGameSimulation:
 		for client_id: int in character_state_and_components_per_client_id:
 			var character_state_and_components: ServerCharacterStateAndComponents = (
 				character_state_and_components_per_client_id[client_id])
-			if character_state_and_components.character_state.input.is_triggered():
+			if character_state_and_components.character_state.input.input_state.is_triggered():
 				var character_components := character_state_and_components.character_components
-				var latest_input_state := character_state_and_components.character_state.input.input_state()
+				var latest_input_state := character_state_and_components.character_state.input.input_state.input_state()
 				var character_transform_state := CharacterTransformState.new(
 					character_state_and_components.character_state.physics_state.position(), 
 					latest_input_state.pitch(), 
@@ -197,7 +198,7 @@ class ServerGameSimulation:
 				character_state_and_components_per_client_id[client_id])
 			var character_entity_id := character_state_and_components.character_state.character_entity_id
 			var character_components := character_state_and_components.character_components
-			var latest_input_state := character_state_and_components.character_state.input.input_state()
+			var latest_input_state := character_state_and_components.character_state.input.input_state.input_state()
 			var next_physics_state := character_components.movement_body().compute_next_physics_state(
 					character_state_and_components.character_state.physics_state, latest_input_state)
 			
@@ -229,8 +230,8 @@ class ServerGameSimulation:
 	static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
 		return CharacterTransformState.new(
 				character_state.physics_state.position(), 
-				character_state.input.input_state().pitch(), 
-				character_state.input.input_state().yaw())
+				character_state.input.input_state.input_state().pitch(), 
+				character_state.input.input_state.input_state().yaw())
 
 	static func __compute_hitscan_ability_results(
 		current_simulation_state: SimulationState,
@@ -241,31 +242,22 @@ class ServerGameSimulation:
 		for client_id: int in character_state_and_components_per_client_id:
 			var character_state_and_components: ServerCharacterStateAndComponents = (
 				character_state_and_components_per_client_id[client_id])
-			if character_state_and_components.character_state.input.is_triggered():
-				var character_entity_id := character_state_and_components.character_state.character_entity_id
-				var character_components := character_state_and_components.character_components
-				var latest_input_state := character_state_and_components.character_state.input.input_state()
-				var character_transform_state := CharacterTransformState.new(
-					character_state_and_components.character_state.physics_state.position(), 
-					latest_input_state.pitch(), 
-					latest_input_state.yaw())
-				var server_tick_client_saw_at_time_of_trigger := (
-					character_state_and_components.character_state.input.displayed_server_tick_at_time_of_trigger())
+			var character_entity_id := character_state_and_components.character_state.character_entity_id
+			var character_components := character_state_and_components.character_components
+			for ability_trigger: InputTrigger in character_state_and_components.character_state.input.input_triggers:
 				var simulation_state_at_time_of_trigger: SimulationState = (
-					simulation_state_per_server_tick[server_tick_client_saw_at_time_of_trigger])
+					simulation_state_per_server_tick[ability_trigger.server_tick_displayed_on_client])
 				var lag_compensated_world_state: Dictionary
 				if simulation_state_at_time_of_trigger != null:
 					lag_compensated_world_state = simulation_state_at_time_of_trigger.character_state_per_client_id
 				else:
 					print("Cannot lag compensate hitscan ability against state with tick %d. Current tick: %d" % [
-						server_tick_client_saw_at_time_of_trigger])
+						ability_trigger.server_tick_displayed_on_client])
 					lag_compensated_world_state = current_simulation_state.character_state_per_client_id
-				var character_camera_transform: Transform3D = (
-					character_components.first_person_display().compute_camera_transform(character_transform_state))
 				var other_character_positions_during_current_tick := (
 					__extract_positions_for_other_characters(lag_compensated_world_state, character_entity_id))
 				var ability_result := character_components.ability_action().perform_ability(
-					character_camera_transform, other_character_positions_during_current_tick)
+					ability_trigger.camera_transform, other_character_positions_during_current_tick)
 				hitscan_ability_results.append_array(ability_result.hitscan_results)
 		return hitscan_ability_results
 
@@ -350,24 +342,67 @@ class ActiveClientSessions:
 
 	func add_new_client_session(client_id: int) -> void:
 		var input_buffer_for_client: OrderedInputBuffer = CLIENT_INPUT_BUFFER_FACTORY.call(client_id)
-		active_session_per_client_id_[client_id] = input_buffer_for_client
+		active_session_per_client_id_[client_id] = InputBufferAndPendingTriggers.new(input_buffer_for_client, [])
 
 	func remove_client_session(client_id: int) -> void:
 		active_session_per_client_id_.erase(client_id)
 
 	func dispatch_input_message(client_id: int, input: ClientInput) -> void:
 		if client_id in active_session_per_client_id_:
-			var input_buffer_for_client: OrderedInputBuffer = active_session_per_client_id_[client_id]
+			var active_client_session: InputBufferAndPendingTriggers = active_session_per_client_id_[client_id]
+			var input_buffer_for_client := active_client_session.input_buffer
 			input_buffer_for_client.push(input)
 		else:
 			print("Cannot enqueue input %s from client %d. No input buffer initialized." % [input, client_id])
+	
+	func dispatch_input_trigger(
+		client_id: int, 
+		camera_transform: Transform3D, 
+		server_tick_displayed_on_client: int
+	) -> void:
+		if client_id in active_session_per_client_id_:
+			var active_client_session: InputBufferAndPendingTriggers = active_session_per_client_id_[client_id]
+			var pending_triggers_for_client := active_client_session.pending_triggers
+			pending_triggers_for_client.append(InputTrigger.new(server_tick_displayed_on_client, camera_transform))
+		else:
+			print("Cannot enqueue trigger from client %d. No input tracker active." % client_id)
 
 	func get_latest_input_per_connected_client_id() -> Dictionary:
 		var latest_input_per_client := {}
 		for client_id: int in active_session_per_client_id_:
-			var input_buffer_for_client: OrderedInputBuffer = active_session_per_client_id_[client_id]
-			latest_input_per_client[client_id] = input_buffer_for_client.pop()
+			var active_client_session: InputBufferAndPendingTriggers = active_session_per_client_id_[client_id]
+			latest_input_per_client[client_id] = active_client_session.pop_latest_input_state_and_triggers()
 		return latest_input_per_client
+
+class InputBufferAndPendingTriggers:
+	var input_buffer: OrderedInputBuffer
+	var pending_triggers: Array[InputTrigger]
+
+	func _init(input_buffer: OrderedInputBuffer, pending_triggers: Array[InputTrigger]) -> void:
+		self.input_buffer = input_buffer
+		self.pending_triggers = pending_triggers
+	
+	func pop_latest_input_state_and_triggers() -> InputStateAndTriggers:
+		var latest_input_state := input_buffer.pop()
+		var triggers_to_return := pending_triggers.duplicate()
+		pending_triggers.clear()
+		return InputStateAndTriggers.new(latest_input_state, triggers_to_return)
+
+class InputStateAndTriggers:
+	var input_state: ClientInput
+	var input_triggers: Array[InputTrigger]
+
+	func _init(input_state: ClientInput, input_triggers: Array[InputTrigger]) -> void:
+		self.input_state = input_state
+		self.input_triggers = input_triggers
+
+class InputTrigger:
+	var server_tick_displayed_on_client: int
+	var camera_transform: Transform3D
+
+	func _init(server_tick_displayed_on_client: int, camera_transform: Transform3D) -> void:
+		self.server_tick_displayed_on_client = server_tick_displayed_on_client
+		self.camera_transform = camera_transform
 
 class ServerToClientStateSnapshotExporter:
 	signal export_state_snapshot(client_id: int, server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
@@ -425,8 +460,8 @@ class ServerToClientStateSnapshotExporter:
 	static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
 		return CharacterTransformState.new(
 				character_state.physics_state.position(), 
-				character_state.input.input_state().pitch(), 
-				character_state.input.input_state().yaw())
+				character_state.input.input_state.input_state().pitch(), 
+				character_state.input.input_state.input_state().yaw())
 	
 	class PerClientExportedData:
 		var client_tick: int
@@ -453,14 +488,14 @@ class ServerCharacterState:
 	var health_state: CharacterHealthState
 	var client_tick_for_input: int
 	var character_entity_id: int
-	var input: ClientInput
+	var input: InputStateAndTriggers
 
 	func _init(
 		physics_state: CharacterPhysicsState, 
 		health_state: CharacterHealthState,
 		client_tick_for_input: int,
 		character_entity_id: int,
-		input: ClientInput
+		input: InputStateAndTriggers
 	) -> void:
 		self.physics_state = physics_state
 		self.health_state = health_state
@@ -468,8 +503,8 @@ class ServerCharacterState:
 		self.character_entity_id = character_entity_id
 		self.input = input
 	
-	func with_input(new_client_input: ClientInput) -> ServerCharacterState:
-		var new_client_tick_for_input: int = new_client_input.input_state().client_tick()
+	func with_input(new_client_input: InputStateAndTriggers) -> ServerCharacterState:
+		var new_client_tick_for_input: int = new_client_input.input_state.input_state().client_tick()
 		return ServerCharacterState.new(
 			physics_state,
 			health_state,
