@@ -152,10 +152,7 @@ func __run_game_simulation_tick() -> void:
 		next_own_character_state, latest_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
 	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
-	__send_recent_inputs_to_server(ClientInput.new(
-			latest_input, 
-			ability_trigger_result.is_triggered, 
-			interpolated_remote_entity_states.tick()).to_dict())
+	__send_recent_inputs_to_server(latest_input.to_dict())
 
 func __should_run_game_simulation() -> bool:
 	return (

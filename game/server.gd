@@ -33,20 +33,14 @@ class ServerGameSimulation:
 	const SPAWN_POINT = Vector3(0, -1.5, 0)
 	const OVERWRITE_EXISTING = true
 	const RESPAWN_TIME_IN_TICKS := 300
-	const EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY := false
-	const CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT := false
 	const ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP := 0
-	static var DEFAULT_CLIENT_INPUT := ClientInput.new(
-		InputState.DEFAULT, 
-		EXTRAPOLATED_INPUTS_CANNOT_TRIGGER_ABILITY, 
-		CLIENT_TICK_AT_TRIGGER_TIME_IRRELEVANT_FOR_DEFAULT_INPUT)
 	static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
 	static var DEFAULT_CHARACTER_SPAWN_STATE := ServerCharacterState.new(
 			DEFAULT_PHYSICS_STATE, 
 			CharacterHealthState.DEFAULT_HEALTH_STATE,
 			Network.NO_TICK,
 			ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP,
-			InputStateAndTriggers.new(DEFAULT_CLIENT_INPUT, []))
+			InputStateAndTriggers.new(InputState.DEFAULT, []))
 
 	var entity_spawner_: EntitySpawner
 	var network_message_bus_: NetworkMessageAndEventBus
@@ -176,17 +170,11 @@ class ServerGameSimulation:
 		for client_id: int in character_state_and_components_per_client_id:
 			var character_state_and_components: ServerCharacterStateAndComponents = (
 				character_state_and_components_per_client_id[client_id])
-			if character_state_and_components.character_state.input.input_state.is_triggered():
-				var character_components := character_state_and_components.character_components
-				var latest_input_state := character_state_and_components.character_state.input.input_state.input_state()
-				var character_transform_state := CharacterTransformState.new(
-					character_state_and_components.character_state.physics_state.position(), 
-					latest_input_state.pitch(), 
-					latest_input_state.yaw())
-				var character_camera_transform: Transform3D = (
-					character_components.first_person_display().compute_camera_transform(character_transform_state))
+			for ability_trigger: InputTrigger in character_state_and_components.character_state.input.input_triggers:
 				network_message_bus_.trigger_remote_character_ability(
-					character_state_and_components.character_state.character_entity_id, character_camera_transform, tick_)
+					character_state_and_components.character_state.character_entity_id, 
+					ability_trigger.camera_transform, 
+					tick_)
 
 	static func __compute_next_state_for_characters(
 		character_state_and_components_per_client_id: Dictionary,
@@ -198,10 +186,9 @@ class ServerGameSimulation:
 				character_state_and_components_per_client_id[client_id])
 			var character_entity_id := character_state_and_components.character_state.character_entity_id
 			var character_components := character_state_and_components.character_components
-			var latest_input_state := character_state_and_components.character_state.input.input_state.input_state()
+			var latest_input_state := character_state_and_components.character_state.input.input_state
 			var next_physics_state := character_components.movement_body().compute_next_physics_state(
 					character_state_and_components.character_state.physics_state, latest_input_state)
-			
 			var current_health := character_state_and_components.character_state.health_state.health()
 			for hitscan_result: HitscanResult in hitscan_results:
 				if hitscan_result.hit_entity_id == character_entity_id:
@@ -230,8 +217,8 @@ class ServerGameSimulation:
 	static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
 		return CharacterTransformState.new(
 				character_state.physics_state.position(), 
-				character_state.input.input_state.input_state().pitch(), 
-				character_state.input.input_state.input_state().yaw())
+				character_state.input.input_state.pitch(), 
+				character_state.input.input_state.yaw())
 
 	static func __compute_hitscan_ability_results(
 		current_simulation_state: SimulationState,
@@ -347,7 +334,7 @@ class InputSubscriptionsForActiveClients:
 	func remove_client_session(client_id: int) -> void:
 		input_source_per_active_client_id_.erase(client_id)
 
-	func dispatch_input_message(client_id: int, input: ClientInput) -> void:
+	func dispatch_input_message(client_id: int, input: InputState) -> void:
 		if client_id in input_source_per_active_client_id_:
 			var client_input_source: InputBufferAndPendingTriggers = input_source_per_active_client_id_[client_id]
 			var input_buffer_for_client := client_input_source.input_buffer
@@ -389,10 +376,10 @@ class InputBufferAndPendingTriggers:
 		return InputStateAndTriggers.new(latest_input_state, triggers_to_return)
 
 class InputStateAndTriggers:
-	var input_state: ClientInput
+	var input_state: InputState
 	var input_triggers: Array[InputTrigger]
 
-	func _init(input_state: ClientInput, input_triggers: Array[InputTrigger]) -> void:
+	func _init(input_state: InputState, input_triggers: Array[InputTrigger]) -> void:
 		self.input_state = input_state
 		self.input_triggers = input_triggers
 
@@ -460,8 +447,8 @@ class ServerToClientStateSnapshotExporter:
 	static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
 		return CharacterTransformState.new(
 				character_state.physics_state.position(), 
-				character_state.input.input_state.input_state().pitch(), 
-				character_state.input.input_state.input_state().yaw())
+				character_state.input.input_state.pitch(), 
+				character_state.input.input_state.yaw())
 	
 	class PerClientExportedData:
 		var client_tick: int
@@ -504,7 +491,7 @@ class ServerCharacterState:
 		self.input = input
 	
 	func with_input(new_client_input: InputStateAndTriggers) -> ServerCharacterState:
-		var new_client_tick_for_input: int = new_client_input.input_state.input_state().client_tick()
+		var new_client_tick_for_input: int = new_client_input.input_state.client_tick()
 		return ServerCharacterState.new(
 			physics_state,
 			health_state,

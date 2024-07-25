@@ -4,7 +4,7 @@ const SERVER_NETWORK_ID = 1
 
 signal received_authoritative_state_snapshot(server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
 signal received_client_trigger(client_id: int, camera_transform: Transform3D, server_tick_displayed_on_client: int)
-signal received_client_input(client_id: int, message: ClientInput)
+signal received_client_input(client_id: int, message: InputState)
 signal triggered_remote_character_ability(
 	remote_character_entity_id: int, 
 	camera_transform: Transform3D,  
@@ -59,8 +59,8 @@ func quit_to_client_menu() -> void:
 @rpc("any_peer", "call_remote", "unreliable")
 func c2s(serialized_inputs: Array) -> void:
 	for serialized_input: Dictionary in serialized_inputs:
-		var client_message := ClientInput.from_dict(serialized_input)
-		received_client_input.emit(multiplayer.get_remote_sender_id(), client_message)
+		var client_input := InputState.from_dict(serialized_input)
+		received_client_input.emit(multiplayer.get_remote_sender_id(), client_input)
 
 # Name is shortened to make the RPC packet size smaller
 @rpc("any_peer", "call_remote", "reliable")
