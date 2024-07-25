@@ -38,7 +38,6 @@ class ServerGameSimulation:
 	static var DEFAULT_CHARACTER_SPAWN_STATE := ServerCharacterState.new(
 			DEFAULT_PHYSICS_STATE, 
 			CharacterHealthState.DEFAULT_HEALTH_STATE,
-			Network.NO_TICK,
 			ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP,
 			InputStateAndTriggers.new(InputState.DEFAULT, []))
 
@@ -437,7 +436,7 @@ class ServerToClientStateSnapshotExporter:
 			var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
 			var next_transform_state := __extract_transform_state(next_character_state)
 			data_to_export_per_client[client_id] = PerClientExportedData.new(
-				next_character_state.client_tick_for_input,
+				next_character_state.input.input_state.client_tick(),
 				next_character_state.physics_state,
 				next_character_state.health_state,
 				next_transform_state,
@@ -473,29 +472,24 @@ class ServerToClientStateSnapshotExporter:
 class ServerCharacterState:
 	var physics_state: CharacterPhysicsState
 	var health_state: CharacterHealthState
-	var client_tick_for_input: int
 	var character_entity_id: int
 	var input: InputStateAndTriggers
 
 	func _init(
 		physics_state: CharacterPhysicsState, 
 		health_state: CharacterHealthState,
-		client_tick_for_input: int,
 		character_entity_id: int,
 		input: InputStateAndTriggers
 	) -> void:
 		self.physics_state = physics_state
 		self.health_state = health_state
-		self.client_tick_for_input = client_tick_for_input
 		self.character_entity_id = character_entity_id
 		self.input = input
 	
 	func with_input(new_client_input: InputStateAndTriggers) -> ServerCharacterState:
-		var new_client_tick_for_input: int = new_client_input.input_state.client_tick()
 		return ServerCharacterState.new(
 			physics_state,
 			health_state,
-			new_client_tick_for_input,
 			character_entity_id,
 			new_client_input)
 	
@@ -503,7 +497,6 @@ class ServerCharacterState:
 		return ServerCharacterState.new(
 			physics_state,
 			health_state,
-			client_tick_for_input,
 			new_character_entity_id,
 			input)
 	
@@ -514,7 +507,6 @@ class ServerCharacterState:
 		return ServerCharacterState.new(
 			new_physics_state, 
 			new_health_state, 
-			client_tick_for_input, 
 			character_entity_id,
 			input)
 
@@ -523,7 +515,6 @@ class ServerCharacterState:
 				+ "character_entity_id=%s, input=%s>" % [
 			physics_state,
 			health_state,
-			client_tick_for_input,
 			character_entity_id,
 			input
 		]
