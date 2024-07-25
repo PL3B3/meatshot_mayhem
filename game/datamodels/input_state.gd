@@ -3,8 +3,28 @@ extends RefCounted
 class_name InputState
 
 enum INPUT_STATE_KEY { YAW, PITCH, IS_JUMPING, IS_SLOW_WALKING, DIRECTION, CLIENT_TICK }
+enum BIT_MASK {
+	IS_JUMPING = 1 << 0,
+	IS_SLOW_WALKING = 1 << 1
+}
 
+const MIN_PITCH: float = -90.0
+const MAX_PITCH: float = 90.0
+const MIN_YAW: float = 0.0
+const MAX_YAW: float = 360.0
+const UINT16_MAX = (1 << 16) - 1 # 65535
 static var DEFAULT := InputState.new(0, 0, false, false, Vector2(), 0)
+static var POSSIBLE_NORMALIZED_MOVE_DIRECTIONS: Array[Vector2] = [
+	Vector2(0,-1).normalized(),
+	Vector2(0,0).normalized(),
+	Vector2(0,1).normalized(),
+	Vector2(1,-1).normalized(),
+	Vector2(1,0).normalized(),
+	Vector2(1,1).normalized(),
+	Vector2(-1,-1).normalized(),
+	Vector2(-1,0).normalized(),
+	Vector2(-1,1).normalized()
+]
 
 var yaw_: float
 var pitch_: float
@@ -65,6 +85,58 @@ static func from_dict(serialized_data: Dictionary) -> InputState:
 		serialized_data[INPUT_STATE_KEY.DIRECTION],
 		serialized_data[INPUT_STATE_KEY.CLIENT_TICK]
 	)
+
+func serialize() -> PackedByteArray:
+	var serialized_input := StreamPeerBuffer.new()
+
+	var pitch_normalized_0_to_1: float = (pitch_ - MIN_PITCH) / (MAX_PITCH - MIN_PITCH)
+	var pitch_as_u16 := int(lerp(0, UINT16_MAX, pitch_normalized_0_to_1))
+	var yaw_normalized_0_to_1: float = (yaw_ - MIN_YAW) / (MAX_YAW - MIN_YAW)
+	var yaw_as_u16 := int(lerp(0, UINT16_MAX, yaw_normalized_0_to_1))
+	var flags_as_u8: int = 0
+	if is_jumping_:
+		flags_as_u8 = flags_as_u8 | BIT_MASK.IS_JUMPING
+	if is_slow_walking_:
+		flags_as_u8 = flags_as_u8 | BIT_MASK.IS_SLOW_WALKING
+	var move_direction_as_u8 := __convert_direction_to_uint8(direction_)
+
+	serialized_input.put_u16(yaw_as_u16)
+	serialized_input.put_u16(pitch_as_u16)
+	serialized_input.put_u8(flags_as_u8)
+	serialized_input.put_u8(move_direction_as_u8)
+	serialized_input.put_32(client_tick_)
+
+	return serialized_input.data_array
+
+static func deserialize(serialized_data: PackedByteArray) -> InputState:
+	var serialized_input := StreamPeerBuffer.new()
+	serialized_input.data_array = serialized_data
+
+	var yaw_as_u16 := serialized_input.get_u16()
+	var pitch_as_u16 := serialized_input.get_u16()
+	var flags_as_u8 := serialized_input.get_u8()
+	var move_direction_as_u8 := serialized_input.get_u8()
+	var client_tick := serialized_input.get_32()
+	
+	var yaw_normalized_0_to_1: float = float(yaw_as_u16) / float(UINT16_MAX)
+	var yaw: float = lerp(MIN_YAW, MAX_YAW, yaw_normalized_0_to_1)
+	var pitch_normalized_0_to_1: float = float(pitch_as_u16) / float(UINT16_MAX)
+	var pitch: float = lerp(MIN_PITCH, MAX_PITCH, pitch_normalized_0_to_1)
+	var is_jumping := bool(flags_as_u8 & BIT_MASK.IS_JUMPING)
+	var is_slow_walking := bool(flags_as_u8 & BIT_MASK.IS_SLOW_WALKING)
+	var move_direction := __convert_uint8_to_direction(move_direction_as_u8)
+
+	return InputState.new(yaw, pitch, is_jumping, is_slow_walking, move_direction, client_tick)
+
+static func __convert_direction_to_uint8(direction: Vector2) -> int:
+	for index: int in range(POSSIBLE_NORMALIZED_MOVE_DIRECTIONS.size()):
+		var possible_move_direction := POSSIBLE_NORMALIZED_MOVE_DIRECTIONS[index]
+		if possible_move_direction.is_equal_approx(direction):
+			return index
+	return -1
+
+static func __convert_uint8_to_direction(direction_index: int) -> Vector2:
+	return POSSIBLE_NORMALIZED_MOVE_DIRECTIONS[direction_index]
 
 func _to_string():
 	return str(to_dict())

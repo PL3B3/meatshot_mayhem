@@ -31,7 +31,7 @@ func notify_client_of_respawn(client_id: int) -> void:
 func send_state_snapshot_to_client(client_id: int, tick: int, snapshot: ServerToClientStateSnapshotMessage) -> void:
 	s2c.rpc_id(client_id, tick, snapshot.to_dict())
 
-# Raw generic Array is used instead of Array[Dictionary] due to a strange static typing issue with RPCs
+# Raw generic Array is used instead of Array[PackedByteArray] due to a strange static typing issue with RPCs
 func send_inputs_to_server(input_messages: Array) -> void:
 	c2s.rpc_id(SERVER_NETWORK_ID, input_messages)
 
@@ -58,8 +58,8 @@ func quit_to_client_menu() -> void:
 # Name is shortened to make the RPC packet size smaller
 @rpc("any_peer", "call_remote", "unreliable")
 func c2s(serialized_inputs: Array) -> void:
-	for serialized_input: Dictionary in serialized_inputs:
-		var client_input := InputState.from_dict(serialized_input)
+	for serialized_input: PackedByteArray in serialized_inputs:
+		var client_input := InputState.deserialize(serialized_input)
 		received_client_input.emit(multiplayer.get_remote_sender_id(), client_input)
 
 # Name is shortened to make the RPC packet size smaller
