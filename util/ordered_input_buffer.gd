@@ -17,7 +17,7 @@ static var DEFAULT_CLIENT_INPUT := ClientInput.new(
 
 var target_size_: int
 var max_size_: int
-var items_: Array[QueueItem] = []
+var input_buffer_: Array[QueuedInput] = []
 
 var queue_size_at_pop_stat_: Statistics
 var queue_size_at_push_stat_: Statistics
@@ -41,27 +41,27 @@ func _init(
 	target_size_ = target_size
 	max_size_ = max_size
 
-func push(client_input: ClientInput, tick: int) -> void:
-	queue_size_at_push_stat_.add_sample(items_.size())
-	var value_wrapped_as_queue_item := QueueItem.new(client_input, VALID, tick)
+func push(client_input: ClientInput) -> void:
+	queue_size_at_push_stat_.add_sample(input_buffer_.size())
+	var value_wrapped_as_queue_item := QueuedInput.new(client_input, VALID)
 	__shrink_queue_if_over_max_size()
 	__insert_item_in_order(value_wrapped_as_queue_item)
 
-func pop() -> QueueItem:
-	queue_size_at_pop_stat_.add_sample(items_.size())
+func pop() -> ClientInput:
+	queue_size_at_pop_stat_.add_sample(input_buffer_.size())
 	__enable_buffering_if_empty()
 	if __check_if_still_buffering():
 		queue_pop_misses_.increment_counter()
 		return __extrapolate_input_to_return_when_buffer_empty()
 	else:
 		ticks_in_a_row_returned_last_valid_input_ = 0
-		latest_popped_tick_ = items_[0].tick()
-		var next_input: QueueItem = items_.pop_front()
-		last_valid_input_ = next_input.value()
-		return next_input
+		latest_popped_tick_ = input_buffer_[0].tick()
+		var next_input: QueuedInput = input_buffer_.pop_front()
+		last_valid_input_ = next_input.value
+		return next_input.value
 
 func __enable_buffering_if_empty() -> bool:
-	if items_.is_empty():
+	if input_buffer_.is_empty():
 		__log("Tried to pop from empty queue. Returning dummy items until %d valid items are buffered", [
 			queue_name_, target_size_])
 		is_buffering_ = true
@@ -70,36 +70,36 @@ func __enable_buffering_if_empty() -> bool:
 		return false
 
 func __check_if_still_buffering() -> bool:
-	if is_buffering_ and items_.size() < target_size_:
-		__log("Currently at %d items, buffering until %d items", [items_.size(), target_size_])
+	if is_buffering_ and input_buffer_.size() < target_size_:
+		__log("Currently at %d items, buffering until %d items", [input_buffer_.size(), target_size_])
 	else:
 		is_buffering_ = false
 	return is_buffering_
 
 func __shrink_queue_if_over_max_size() -> void:
-	if items_.size() >= max_size_:
+	if input_buffer_.size() >= max_size_:
 		__log(
 			"Queue has more than %d items, discarding oldest items until size reaches %d", 
 			[queue_name_, max_size_, target_size_])
-		while items_.size() > target_size_:
-			items_.pop_front()
+		while input_buffer_.size() > target_size_:
+			input_buffer_.pop_front()
 
-func __insert_item_in_order(item: QueueItem) -> void:
-	if item.tick() <= latest_popped_tick_:
+func __insert_item_in_order(queued_input: QueuedInput) -> void:
+	if queued_input.tick() <= latest_popped_tick_:
 		return
-	for i in items_.size():
-		if items_[i].tick() > item.tick():
-			items_.insert(i, item)
+	for i in input_buffer_.size():
+		if input_buffer_[i].tick() > queued_input.tick():
+			input_buffer_.insert(i, queued_input)
 			return
-		elif items_[i].tick() == item.tick():
-			items_[i] = item
+		elif input_buffer_[i].tick() == queued_input.tick():
+			input_buffer_[i] = queued_input
 			return
-	__append_item_with_highest_tick_to_end_of_buffer(item)
+	__append_item_with_highest_tick_to_end_of_buffer(queued_input)
 
-func __append_item_with_highest_tick_to_end_of_buffer(item: QueueItem) -> void:
-	items_.push_back(item)
+func __append_item_with_highest_tick_to_end_of_buffer(queued_input: QueuedInput) -> void:
+	input_buffer_.push_back(queued_input)
 
-func __extrapolate_input_to_return_when_buffer_empty() -> QueueItem:
+func __extrapolate_input_to_return_when_buffer_empty() -> ClientInput:
 	var input_to_return: ClientInput
 	if ticks_in_a_row_returned_last_valid_input_ < MAXIMUM_TIMES_TO_RETURN_LAST_VALID_INPUT:
 		ticks_in_a_row_returned_last_valid_input_ += 1
@@ -108,7 +108,7 @@ func __extrapolate_input_to_return_when_buffer_empty() -> QueueItem:
 	else:
 		input_to_return = __create_default_input_state_with_last_known_view_angle(last_valid_input_)
 		__log("Using default input as placeholder: %s", [input_to_return])
-	return QueueItem.new(input_to_return, VALID, Network.NO_TICK)
+	return input_to_return
 
 static func __create_default_input_state_with_last_known_view_angle(last_valid_input: ClientInput) -> ClientInput:
 	var input_state_standing_still_with_last_known_view_angle := InputState.new(
@@ -141,3 +141,14 @@ func __log(format_string: String, args: Array[Variant] = []) -> void:
 	if IS_LOGGING_ENABLED:
 		var log_message: String = format_string % args
 		print("%s :: %s" % [queue_name_, log_message])
+
+class QueuedInput:
+	var value: ClientInput
+	var is_valid: bool
+
+	func _init(value: ClientInput, is_valid: bool) -> void:
+		self.value = value
+		self.is_valid = is_valid
+	
+	func tick() -> int:
+		return value.input_state().client_tick()

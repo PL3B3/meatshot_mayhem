@@ -151,10 +151,10 @@ class ServerGameSimulation:
 		for client_id_for_existing_character: int in simulation_state_.character_state_per_client_id:
 			var character_state: ServerCharacterState = (
 				simulation_state_.character_state_per_client_id[client_id_for_existing_character])
-			var latest_client_input_with_tick: QueueItem = (
+			var latest_client_input: ClientInput = (
 				latest_input_per_connected_client_id[client_id_for_existing_character])
 			simulation_state_.character_state_per_client_id[client_id_for_existing_character] = (
-				character_state.with_input(latest_client_input_with_tick))
+				character_state.with_input(latest_client_input))
 
 	func __arrange_state_and_components_per_character() -> Dictionary:
 		var character_state_and_components_per_client_id: Dictionary = {}
@@ -355,10 +355,10 @@ class ActiveClientSessions:
 	func remove_client_session(client_id: int) -> void:
 		active_session_per_client_id_.erase(client_id)
 
-	func dispatch_input_message(client_id: int, input: ClientToServerInputMessage) -> void:
+	func dispatch_input_message(client_id: int, input: ClientInput) -> void:
 		if client_id in active_session_per_client_id_:
 			var input_buffer_for_client: OrderedInputBuffer = active_session_per_client_id_[client_id]
-			input_buffer_for_client.push(input.client_input(), input.client_tick())
+			input_buffer_for_client.push(input)
 		else:
 			print("Cannot enqueue input %s from client %d. No input buffer initialized." % [input, client_id])
 
@@ -468,9 +468,8 @@ class ServerCharacterState:
 		self.character_entity_id = character_entity_id
 		self.input = input
 	
-	func with_input(new_client_input_and_tick: QueueItem) -> ServerCharacterState:
-		var new_client_input: ClientInput = new_client_input_and_tick.value()
-		var new_client_tick_for_input: int = new_client_input_and_tick.tick()
+	func with_input(new_client_input: ClientInput) -> ServerCharacterState:
+		var new_client_tick_for_input: int = new_client_input.input_state().client_tick()
 		return ServerCharacterState.new(
 			physics_state,
 			health_state,
