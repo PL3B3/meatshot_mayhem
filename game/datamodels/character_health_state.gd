@@ -26,6 +26,12 @@ static func from_dict(dict: Dictionary) -> CharacterHealthState:
 		dict[CHARACTER_HEALTH_STATE.HEALTH]
 	)
 
+func serialize_to_stream(serialized_data_stream: StreamPeerBuffer) -> void:
+	serialized_data_stream.put_u8(health_)
+
+static func consume_and_deserialize(serialized_data_stream: StreamPeerBuffer) -> CharacterHealthState:
+	return CharacterHealthState.new(serialized_data_stream.get_u8())
+
 func _to_string() -> String:
 	return "CharacterHealthState<HEALTH=%s>" % [
 		health_    
