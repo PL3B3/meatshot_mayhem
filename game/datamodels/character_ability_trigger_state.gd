@@ -23,6 +23,12 @@ static func from_dict(dict: Dictionary) -> CharacterAbilityTriggerState:
 		dict[CHARACTER_ABILITY_TRIGGER_STATE.TICKS_UNTIL_CAN_TRIGGER]
 	)
 
+func serialize_to_stream(serialized_data_stream: StreamPeerBuffer) -> void:
+	serialized_data_stream.put_u8(ticks_until_can_trigger_)
+
+static func consume_and_deserialize(serialized_data_stream: StreamPeerBuffer) -> CharacterAbilityTriggerState:
+	return CharacterAbilityTriggerState.new(serialized_data_stream.get_u8())
+
 func _to_string() -> String:
 	return "CharacterAbilityTriggerState<TICKS_UNTIL_CAN_TRIGGER=%s>" % [
 		ticks_until_can_trigger_    
