@@ -51,17 +51,13 @@ static func from_dict(dict: Dictionary) -> ClientOwnCharacterState:
 		InputState.from_dict(dict[CLIENT_OWN_CHARACTER_STATE.INPUT_STATE])
 	)
 
-func serialize() -> PackedByteArray:
-	var serialized_data_stream := StreamPeerBuffer.new()
+func serialize_to_stream(serialized_data_stream: StreamPeerBuffer) -> void:
 	physics_state_.serialize_to_stream(serialized_data_stream)
 	ability_trigger_state_.serialize_to_stream(serialized_data_stream)
 	health_state_.serialize_to_stream(serialized_data_stream)
 	# no need to serialize input state, as it's not used on client
-	return serialized_data_stream.data_array
 
-static func deserialize(serialized_data: PackedByteArray) -> ClientOwnCharacterState:
-	var serialized_data_stream := StreamPeerBuffer.new()
-	serialized_data_stream.data_array = serialized_data
+static func consume_and_deserialize(serialized_data_stream: StreamPeerBuffer) -> ClientOwnCharacterState:
 	return ClientOwnCharacterState.new(
 		CharacterPhysicsState.consume_and_deserialize(serialized_data_stream),
 		CharacterAbilityTriggerState.consume_and_deserialize(serialized_data_stream),
