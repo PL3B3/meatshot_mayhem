@@ -299,14 +299,15 @@ func __send_recent_inputs_to_server(latest_input_state: InputState) -> void:
 		recent_client_to_server_inputs_.pop_front()
 	network_bus_.send_inputs_to_server(recent_client_to_server_inputs_)
 
-func __handle_authoritative_server_state(server_tick: int, state_snapshot: ServerToClientStateSnapshotMessage) -> void:
-	var authoritative_remote_state := state_snapshot.client_state_snapshot().remote_character_states()
+func __handle_authoritative_server_state(server_tick: int, client_tick: int, state_snapshot: ClientStateSnapshot) -> void:
+	var authoritative_remote_state := state_snapshot.remote_character_states()
 	client_remote_state_buffer_.push(authoritative_remote_state, server_tick)
 	if !client_state_timeline_.has_states():
-		client_state_timeline_.add_next_state(state_snapshot.client_state_snapshot())
-	if state_snapshot.client_tick() != Network.NO_TICK:
-		latest_reconciliation_data_ = Optional.of(ReconciliationData.from_server_to_client_snapshot(state_snapshot))
-	latest_authoritative_health_state = state_snapshot.client_state_snapshot().own_character_state().health_state()
+		client_state_timeline_.add_next_state(state_snapshot)
+	if client_tick != Network.NO_TICK:
+		latest_reconciliation_data_ = Optional.of(
+			ReconciliationData.from_server_to_client_snapshot(client_tick, state_snapshot))
+	latest_authoritative_health_state = state_snapshot.own_character_state().health_state()
 
 func __on_triggered_remote_character_ability(
 	remote_character_entity_id: int,
@@ -381,10 +382,10 @@ class ReconciliationData:
 		physics_state_ = physics_state
 		client_tick_ = client_tick
 	
-	static func from_server_to_client_snapshot(snapshot: ServerToClientStateSnapshotMessage) -> ReconciliationData:
+	static func from_server_to_client_snapshot(client_tick: int, snapshot: ClientStateSnapshot) -> ReconciliationData:
 		return ReconciliationData.new(
-			snapshot.client_state_snapshot().own_character_state().physics_state(), 
-			snapshot.client_tick())
+			snapshot.own_character_state().physics_state(), 
+			client_tick)
 	
 	func physics_state() -> CharacterPhysicsState:
 		return physics_state_

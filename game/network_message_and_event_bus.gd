@@ -2,7 +2,7 @@ class_name NetworkMessageAndEventBus extends Node
 
 const SERVER_NETWORK_ID = 1
 
-signal received_authoritative_state_snapshot(server_tick: int, snapshot: ServerToClientStateSnapshotMessage)
+signal received_authoritative_state_snapshot(server_tick: int, client_tick: int, snapshot: ClientStateSnapshot)
 signal received_client_trigger(client_id: int, camera_transform: Transform3D, server_tick_displayed_on_client: int)
 signal received_client_input(client_id: int, message: InputState)
 signal triggered_remote_character_ability(
@@ -29,7 +29,7 @@ func notify_client_of_respawn(client_id: int) -> void:
 	__handle_respawn.rpc_id(client_id)
 
 func send_state_snapshot_to_client(client_id: int, tick: int, snapshot: ServerToClientStateSnapshotMessage) -> void:
-	s2c.rpc_id(client_id, tick, snapshot.to_dict())
+	s2c.rpc_id(client_id, tick, snapshot.client_tick(), snapshot.client_state_snapshot().serialize())
 
 # Raw generic Array is used instead of Array[PackedByteArray] due to a strange static typing issue with RPCs
 func send_inputs_to_server(input_messages: Array) -> void:
@@ -69,9 +69,9 @@ func ct2s(camera_transform: Transform3D, server_tick_displayed: int) -> void:
 
 # Name is shortened to make the RPC packet size smaller
 @rpc("authority", "call_remote", "unreliable")
-func s2c(state_snapshot_server_tick: int, serialized_state_snapshot: Dictionary) -> void:
-	var deserialized_state_snapshot := ServerToClientStateSnapshotMessage.from_dict(serialized_state_snapshot)
-	received_authoritative_state_snapshot.emit(state_snapshot_server_tick, deserialized_state_snapshot)
+func s2c(state_snapshot_server_tick: int, client_tick: int, serialized_state_snapshot: PackedByteArray) -> void:
+	var deserialized_state_snapshot := ClientStateSnapshot.deserialize(serialized_state_snapshot)
+	received_authoritative_state_snapshot.emit(state_snapshot_server_tick, client_tick, deserialized_state_snapshot)
 
 @rpc("authority", "call_remote", "reliable")
 func __handle_death() -> void:
