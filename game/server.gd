@@ -1,7 +1,6 @@
 extends Node
 class_name Server
 
-@onready var map_spawner: MultiplayerSpawner = $MapSpawner
 @onready var entity_spawner_: EntitySpawner = $EntitySpawner
 @onready var client_input_subscribers_ := InputSubscriptionsForActiveClients.new()
 
@@ -19,7 +18,6 @@ func _ready() -> void:
 	network_message_bus_.client_disconnected.connect(client_input_subscribers_.remove_client_session)
 	network_message_bus_.client_connected.connect(client_input_subscribers_.add_new_client_session)
 	add_child(network_message_bus_)
-	map_spawner.spawn(null)
 
 func _physics_process(_delta: float) -> void:
 	var latest_input_per_connected_client_id := client_input_subscribers_.get_latest_input_per_connected_client_id()
