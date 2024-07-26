@@ -1,10 +1,10 @@
 [gd_scene load_steps=8 format=3 uid="uid://clb01f0ifogre"]
 
 [ext_resource type="Script" path="res://game/client.gd" id="1_x1e1o"]
-[ext_resource type="PackedScene" uid="uid://bmyetss0yrpp5" path="res://game/spawners/map_spawner.tscn" id="2_pgb0g"]
 [ext_resource type="PackedScene" uid="uid://b43a0dnmkibyw" path="res://game/client_input_handler.tscn" id="4_53bko"]
 [ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://game/network_messenger.tscn" id="5_ilfw4"]
 [ext_resource type="PackedScene" uid="uid://df8ewfg0kmle6" path="res://game/entity_spawner.tscn" id="5_w3vlx"]
+[ext_resource type="PackedScene" uid="uid://761xbykfvwo6" path="res://game/large_test_map.tscn" id="6_1n4h1"]
 [ext_resource type="Texture2D" uid="uid://dx2ex6b2855uv" path="res://assets/overhang_fence_planks.png" id="6_bjqop"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_hfiku"]
@@ -15,8 +15,6 @@ font_size = 120
 script = ExtResource("1_x1e1o")
 
 [node name="Spawns" type="Node" parent="."]
-
-[node name="MapSpawner" parent="." instance=ExtResource("2_pgb0g")]
 
 [node name="ClientInputHandler" parent="." instance=ExtResource("4_53bko")]
 
@@ -61,3 +59,5 @@ text = "YOU ARE DEAD"
 label_settings = SubResource("LabelSettings_hfiku")
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="LargeTestMap" parent="." instance=ExtResource("6_1n4h1")]

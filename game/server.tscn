@@ -1,9 +1,9 @@
 [gd_scene load_steps=5 format=3 uid="uid://dbbfwqe04glnk"]
 
 [ext_resource type="Script" path="res://game/server.gd" id="1_nwq0y"]
-[ext_resource type="PackedScene" uid="uid://bmyetss0yrpp5" path="res://game/spawners/map_spawner.tscn" id="2_cv5qq"]
 [ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://game/network_messenger.tscn" id="4_570yk"]
-[ext_resource type="PackedScene" uid="uid://ftsn6dep3odr" path="res://game/entity_spawner.tscn" id="4_sxneu"]
+[ext_resource type="PackedScene" uid="uid://df8ewfg0kmle6" path="res://game/entity_spawner.tscn" id="4_sxneu"]
+[ext_resource type="PackedScene" uid="uid://761xbykfvwo6" path="res://game/large_test_map.tscn" id="4_u00lm"]
 
 [node name="NetworkRoot" type="Node"]
 script = ExtResource("1_nwq0y")
@@ -25,8 +25,8 @@ text = "SERVER"
 
 [node name="Spawns" type="Node" parent="."]
 
-[node name="MapSpawner" parent="." instance=ExtResource("2_cv5qq")]
-
 [node name="NetworkMessenger" parent="." instance=ExtResource("4_570yk")]
 
 [node name="EntitySpawner" parent="." instance=ExtResource("4_sxneu")]
+
+[node name="LargeTestMap" parent="." instance=ExtResource("4_u00lm")]
