@@ -91,8 +91,8 @@ func serialize() -> PackedByteArray:
 		flags_as_u8 = flags_as_u8 | BIT_MASK.IS_SLOW_WALKING
 	var move_direction_as_u8 := __convert_direction_to_uint8(direction_)
 
-	serialized_input.put_u16(SerdeUtil.yaw_to_u16(yaw_))
-	serialized_input.put_u16(SerdeUtil.pitch_to_u16(pitch_))
+	serialized_input.put_u16(SerdeUtil.YAW_DEG_SERDE.serialize_float_to_u16(yaw_))
+	serialized_input.put_u16(SerdeUtil.PITCH_DEG_SERDE.serialize_float_to_u16(pitch_))
 	serialized_input.put_u8(flags_as_u8)
 	serialized_input.put_u8(move_direction_as_u8)
 	serialized_input.put_32(client_tick_)
@@ -109,8 +109,8 @@ static func deserialize(serialized_data: PackedByteArray) -> InputState:
 	var move_direction_as_u8 := serialized_input.get_u8()
 	var client_tick := serialized_input.get_32()
 	
-	var yaw: float = SerdeUtil.u16_to_yaw(yaw_as_u16)
-	var pitch: float = SerdeUtil.u16_to_pitch(pitch_as_u16)
+	var yaw: float = SerdeUtil.YAW_DEG_SERDE.deserialize_float_from_u16(yaw_as_u16)
+	var pitch: float = SerdeUtil.PITCH_DEG_SERDE.deserialize_float_from_u16(pitch_as_u16)
 	var is_jumping := bool(flags_as_u8 & BIT_MASK.IS_JUMPING)
 	var is_slow_walking := bool(flags_as_u8 & BIT_MASK.IS_SLOW_WALKING)
 	var move_direction := __convert_uint8_to_direction(move_direction_as_u8)

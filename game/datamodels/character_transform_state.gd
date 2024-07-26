@@ -41,11 +41,11 @@ static func from_dict(dict: Dictionary) -> CharacterTransformState:
 
 func serialize() -> PackedByteArray:
 	var serialized_input := StreamPeerBuffer.new()
-	serialized_input.put_u16(SerdeUtil.position_axis_to_u16(position_.x))
-	serialized_input.put_u16(SerdeUtil.position_axis_to_u16(position_.y))
-	serialized_input.put_u16(SerdeUtil.position_axis_to_u16(position_.z))
-	serialized_input.put_u16(SerdeUtil.pitch_to_u16(pitch_))
-	serialized_input.put_u16(SerdeUtil.yaw_to_u16(yaw_))
+	serialized_input.put_u16(SerdeUtil.POSITION_AXIS_SERDE.serialize_float_to_u16(position_.x))
+	serialized_input.put_u16(SerdeUtil.POSITION_AXIS_SERDE.serialize_float_to_u16(position_.y))
+	serialized_input.put_u16(SerdeUtil.POSITION_AXIS_SERDE.serialize_float_to_u16(position_.z))
+	serialized_input.put_u16(SerdeUtil.PITCH_DEG_SERDE.serialize_float_to_u16(pitch_))
+	serialized_input.put_u16(SerdeUtil.YAW_DEG_SERDE.serialize_float_to_u16(yaw_))
 	return serialized_input.data_array
 
 static func deserialize(serialized_data: PackedByteArray) -> CharacterTransformState:
@@ -53,11 +53,11 @@ static func deserialize(serialized_data: PackedByteArray) -> CharacterTransformS
 	serialized_input.data_array = serialized_data
 	return CharacterTransformState.new(
 		Vector3(
-			SerdeUtil.u16_to_position_axis(serialized_input.get_u16()),
-			SerdeUtil.u16_to_position_axis(serialized_input.get_u16()),
-			SerdeUtil.u16_to_position_axis(serialized_input.get_u16())),
-		SerdeUtil.u16_to_pitch(serialized_input.get_u16()),
-		SerdeUtil.u16_to_yaw(serialized_input.get_u16()))
+			SerdeUtil.POSITION_AXIS_SERDE.deserialize_float_from_u16(serialized_input.get_u16()),
+			SerdeUtil.POSITION_AXIS_SERDE.deserialize_float_from_u16(serialized_input.get_u16()),
+			SerdeUtil.POSITION_AXIS_SERDE.deserialize_float_from_u16(serialized_input.get_u16())),
+		SerdeUtil.PITCH_DEG_SERDE.deserialize_float_from_u16(serialized_input.get_u16()),
+		SerdeUtil.YAW_DEG_SERDE.deserialize_float_from_u16(serialized_input.get_u16()))
 
 func _to_string() -> String:
 	return "CharacterTransformState<POSITION=%s, PITCH=%s, YAW=%s>" % [
