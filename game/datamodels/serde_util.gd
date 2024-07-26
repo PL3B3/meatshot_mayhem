@@ -3,6 +3,7 @@ class_name SerdeUtil extends RefCounted
 static var YAW_DEG_SERDE := FloatToU16SerDe.new(0, 360)
 static var PITCH_DEG_SERDE := FloatToU16SerDe.new(-180, 180)
 static var POSITION_AXIS_SERDE := FloatToU16SerDe.new(-500, 500)
+static var POSITION_Y_AXIS_SERDE := FloatToU16SerDe.new(-10, 50)
 static var VELOCITY_AXIS_SERDE := FloatToU16SerDe.new(-100, 100)
 
 class FloatToU16SerDe:
