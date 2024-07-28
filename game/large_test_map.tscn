@@ -1,7 +1,6 @@
 [gd_scene load_steps=12 format=3 uid="uid://761xbykfvwo6"]
 
 [ext_resource type="Environment" uid="uid://cwjnu3fulwik2" path="res://assets/environment_bright.tres" id="1_mdafn"]
-[ext_resource type="Texture2D" uid="uid://dx2ex6b2855uv" path="res://assets/overhang_fence_planks.png" id="2_11hry"]
 [ext_resource type="Texture2D" uid="uid://dvsdqx4qq7yi5" path="res://assets/texture_02.png" id="3_oqarb"]
 [ext_resource type="PackedScene" uid="uid://f8b0rlfdw0bm" path="res://game/block.tscn" id="4_m0jij"]
 [ext_resource type="PackedScene" uid="uid://dltio1maqii4i" path="res://game/debug_sphere.tscn" id="5_npfxi"]
@@ -9,8 +8,11 @@
 
 [sub_resource type="WorldBoundaryShape3D" id="WorldBoundaryShape3D_tyg1n"]
 
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_8nkgc"]
+load_path = "res://.godot/imported/overhang_fence_planks.png-b338c818a421c5dd7f3cba6b0cd399bc.ctex"
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uan86"]
-albedo_texture = ExtResource("2_11hry")
+albedo_texture = SubResource("CompressedTexture2D_8nkgc")
 metallic_specular = 0.3
 roughness = 0.8
 normal_scale = 8.0
@@ -19,6 +21,7 @@ clearcoat = 0.09
 clearcoat_roughness = 0.62
 uv1_scale = Vector3(0.1, 0.1, 0.1)
 uv1_triplanar = true
+texture_filter = 0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_2rb4i"]
 material = SubResource("StandardMaterial3D_uan86")
