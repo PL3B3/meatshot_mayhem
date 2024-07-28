@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" path="res://game/server.gd" id="1_nwq0y"]
 [ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://game/network_messenger.tscn" id="4_570yk"]
+[ext_resource type="PackedScene" uid="uid://cdeofkdnlceq7" path="res://game/simple_dm_map.tscn" id="4_c6508"]
 [ext_resource type="PackedScene" uid="uid://df8ewfg0kmle6" path="res://game/entity_spawner.tscn" id="4_sxneu"]
-[ext_resource type="PackedScene" uid="uid://761xbykfvwo6" path="res://game/large_test_map.tscn" id="4_u00lm"]
 
 [node name="NetworkRoot" type="Node"]
 script = ExtResource("1_nwq0y")
@@ -29,4 +29,4 @@ text = "SERVER"
 
 [node name="EntitySpawner" parent="." instance=ExtResource("4_sxneu")]
 
-[node name="LargeTestMap" parent="." instance=ExtResource("4_u00lm")]
+[node name="SimpleDmMap" parent="." instance=ExtResource("4_c6508")]
