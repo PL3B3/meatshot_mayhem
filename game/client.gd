@@ -111,6 +111,7 @@ func __run_game_simulation_tick() -> void:
 		latest_own_character_health_state.health(),
 		own_character_transform_state, 
 		own_character_components.first_person_display())
+	own_character_components.first_person_display().play_walking_audio_blended_by_speed(own_character_physics_state)
 	__display_remote_characters(remote_character_resources)
 	var next_own_character_physics_state: CharacterPhysicsState = __compute_next_physics_state(
 		optionally_reconciled_own_character_physics_state, 
