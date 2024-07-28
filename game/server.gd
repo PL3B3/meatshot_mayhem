@@ -26,18 +26,21 @@ func _physics_process(_delta: float) -> void:
 class ServerGameSimulation:
 	signal simulation_state_advanced(tick: int, current_simulation_state: Dictionary)
 
-	const EMPTY_PHYSICS_STATE = {}
-	const SPAWN_POINT_RANDOM_VARIATION = 5
-	const SPAWN_POINT = Vector3(0, -1.5, 0)
 	const OVERWRITE_EXISTING = true
 	const RESPAWN_TIME_IN_TICKS := 300
 	const ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP := 0
-	static var DEFAULT_PHYSICS_STATE := CharacterPhysicsState.new(SPAWN_POINT, Vector3.ZERO, false)
-	static var DEFAULT_CHARACTER_SPAWN_STATE := ServerCharacterState.new(
-			DEFAULT_PHYSICS_STATE, 
-			CharacterHealthState.DEFAULT_HEALTH_STATE,
-			ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP,
-			InputStateAndTriggers.new(InputState.DEFAULT, []))
+	const SPAWN_POINT_HORIZONTAL_OFFSET := 40.0
+	const SPAWN_POINT_VERTICAL_OFFSET := 15.0
+	const SPAWN_POINTS := [
+		Vector3(SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, SPAWN_POINT_HORIZONTAL_OFFSET),
+		Vector3(SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, -SPAWN_POINT_HORIZONTAL_OFFSET),
+		Vector3(-SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, SPAWN_POINT_HORIZONTAL_OFFSET),
+		Vector3(-SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, -SPAWN_POINT_HORIZONTAL_OFFSET),
+		Vector3(0, SPAWN_POINT_VERTICAL_OFFSET, SPAWN_POINT_HORIZONTAL_OFFSET),
+		Vector3(0, SPAWN_POINT_VERTICAL_OFFSET, -SPAWN_POINT_HORIZONTAL_OFFSET),
+		Vector3(-SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, 0),
+		Vector3(-SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, 0)
+	]
 
 	var entity_spawner_: EntitySpawner
 	var network_message_bus_: NetworkMessageAndEventBus
@@ -131,7 +134,8 @@ class ServerGameSimulation:
 			var does_character_already_exist_for_player := (
 				client_id_for_existing_player in simulation_state_.character_state_per_client_id)
 			if is_player_alive and not does_character_already_exist_for_player:
-				simulation_state_.create_character(client_id_for_existing_player, DEFAULT_CHARACTER_SPAWN_STATE)
+				var character_state_at_spawn := __create_spawn_state_with_random_position()
+				simulation_state_.create_character(client_id_for_existing_player, character_state_at_spawn)
 				newly_respawned_client_ids.append(client_id_for_existing_player)
 		return newly_respawned_client_ids
 
@@ -172,6 +176,16 @@ class ServerGameSimulation:
 					character_state_and_components.character_state.character_entity_id, 
 					ability_trigger.camera_transform, 
 					tick_)
+
+	static func __create_spawn_state_with_random_position() -> ServerCharacterState:
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var randomly_chosen_spawn_point: Vector3 = SPAWN_POINTS[rng.randi() % SPAWN_POINTS.size()]
+		return ServerCharacterState.new(
+			CharacterPhysicsState.new(randomly_chosen_spawn_point, Vector3.ZERO, false), 
+			CharacterHealthState.DEFAULT_HEALTH_STATE,
+			ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP,
+			InputStateAndTriggers.new(InputState.DEFAULT, []))
 
 	static func __compute_next_state_for_characters(
 		character_state_and_components_per_client_id: Dictionary,
