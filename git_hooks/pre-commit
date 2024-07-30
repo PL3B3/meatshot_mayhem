@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# run this command in the repo root to setup this pre-commit hook
+# git config core.hooksPath git_hooks
+set -eo pipefail
+
+printf "class_name Version\nconst VERSION := \"$(date +"%F-%T")::$(openssl rand -base64 12)\"" > version.gd
+git add version.gd

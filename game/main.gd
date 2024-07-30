@@ -10,6 +10,7 @@ const ENABLE_TEST_MODE := true
 @onready var __server_host_button: Button = $VBoxContainer/ServerButton
 
 func _ready() -> void:
+	print("Game version: %s" % Version.VERSION)
 	if __is_running_in_dedicated_server_mode():
 		__try_start_server()
 	elif ENABLE_TEST_MODE and OS.is_debug_build():
