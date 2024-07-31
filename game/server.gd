@@ -63,17 +63,16 @@ class ServerGameSimulation:
 		__delete_character_states_for_dead_players()
 		__create_character_states_for_living_players_and_notify_clients()
 		__populate_character_states_with_latest_input(latest_input_per_connected_client_id)
-		var character_state_and_components_per_client_id := __arrange_state_and_components_per_character()
 		var hitscan_results := __compute_hitscan_ability_results(
-			simulation_state_, simulation_state_per_server_tick_, character_state_and_components_per_client_id)
+			simulation_state_, simulation_state_per_server_tick_, entity_spawner_)
 		var next_character_state_per_client_id := __compute_next_state_for_characters(
-			character_state_and_components_per_client_id, hitscan_results)
+			simulation_state_, hitscan_results, entity_spawner_)
 
-		__display_character_states(character_state_and_components_per_client_id, next_character_state_per_client_id)
+		__display_character_states(next_character_state_per_client_id, entity_spawner_)
 		__draw_bullet_tracers(tracer_displayer, hitscan_results)
 		__draw_bullet_hits(debug_sphere_displayer, hitscan_results)
 
-		for client_id: int in character_state_and_components_per_client_id:
+		for client_id: int in next_character_state_per_client_id:
 			var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
 			if next_character_state.health_state.health() <= 0:
 				next_character_state_per_client_id.erase(client_id)
@@ -83,7 +82,7 @@ class ServerGameSimulation:
 				network_message_bus_.notify_client_of_death(client_id)
 
 		entity_spawner_.despawn_entities_not_in_server_snapshot(next_character_state_per_client_id)
-		__replicate_ability_trigger_on_remote_characters(character_state_and_components_per_client_id)
+		__replicate_ability_trigger_on_remote_characters(next_character_state_per_client_id)
 		
 		simulation_state_advanced.emit(tick_, next_character_state_per_client_id)
 		simulation_state_.character_state_per_client_id = next_character_state_per_client_id
@@ -152,30 +151,17 @@ class ServerGameSimulation:
 			simulation_state_.character_state_per_client_id[client_id_for_existing_character] = (
 				character_state.with_input(latest_client_input))
 
-	func __arrange_state_and_components_per_character() -> Dictionary:
-		var character_state_and_components_per_client_id: Dictionary = {}
-		for client_id: int in simulation_state_.character_state_per_client_id:
-			var server_state: ServerCharacterState = simulation_state_.character_state_per_client_id[client_id]
-			var components := entity_spawner_.get_or_spawn_character(
-				server_state.character_entity_id, CONSTANTS.NetworkEntityMode.SERVER)
-			character_state_and_components_per_client_id[client_id] = ServerCharacterStateAndComponents.new(
-				server_state, components)
-		return character_state_and_components_per_client_id
-
 	func __clear_stale_simulation_states() -> void:
 		for stale_tick: int in simulation_state_per_server_tick_.keys():
 			if stale_tick < tick_ - 100:
 				simulation_state_per_server_tick_.erase(stale_tick)
 
-	func __replicate_ability_trigger_on_remote_characters(character_state_and_components_per_client_id: Dictionary) -> void:
-		for client_id: int in character_state_and_components_per_client_id:
-			var character_state_and_components: ServerCharacterStateAndComponents = (
-				character_state_and_components_per_client_id[client_id])
-			for ability_trigger: InputTrigger in character_state_and_components.character_state.input.input_triggers:
+	func __replicate_ability_trigger_on_remote_characters(character_state_per_client_id: Dictionary) -> void:
+		for client_id: int in character_state_per_client_id:
+			var character_state: ServerCharacterState = character_state_per_client_id[client_id]
+			for ability_trigger: InputTrigger in character_state.input.input_triggers:
 				network_message_bus_.trigger_remote_character_ability(
-					character_state_and_components.character_state.character_entity_id, 
-					ability_trigger.camera_transform, 
-					tick_)
+					character_state.character_entity_id, ability_trigger.camera_transform, tick_)
 
 	static func __create_spawn_state_with_random_position() -> ServerCharacterState:
 		var rng := RandomNumberGenerator.new()
@@ -188,38 +174,35 @@ class ServerGameSimulation:
 			InputStateAndTriggers.new(InputState.DEFAULT, []))
 
 	static func __compute_next_state_for_characters(
-		character_state_and_components_per_client_id: Dictionary,
-		hitscan_results: Array[HitscanResult]
+		current_simulation_state: SimulationState,
+		hitscan_results: Array[HitscanResult],
+		entity_spawner: EntitySpawner
 	) -> Dictionary:
 		var next_world_state := {}
-		for client_id: int in character_state_and_components_per_client_id:
-			var character_state_and_components: ServerCharacterStateAndComponents = (
-				character_state_and_components_per_client_id[client_id])
-			var character_entity_id := character_state_and_components.character_state.character_entity_id
-			var character_components := character_state_and_components.character_components
-			var latest_input_state := character_state_and_components.character_state.input.input_state
+		for client_id: int in current_simulation_state.character_state_per_client_id:
+			var character_state: ServerCharacterState = (
+				current_simulation_state.character_state_per_client_id[client_id])
+			var character_entity_id := character_state.character_entity_id
+			var character_components := entity_spawner.get_or_spawn_server_character(character_entity_id)
 			var next_physics_state := character_components.movement_body().compute_next_physics_state(
-					character_state_and_components.character_state.physics_state, latest_input_state)
-			var current_health := character_state_and_components.character_state.health_state.health()
+					character_state.physics_state, character_state.input.input_state)
+			var current_health := character_state.health_state.health()
 			for hitscan_result: HitscanResult in hitscan_results:
 				if hitscan_result.hit_entity_id == character_entity_id:
 					current_health -= hitscan_result.damage
-			var next_health_state := CharacterHealthState.new(current_health)
-			
-			next_world_state[client_id] = (
-				character_state_and_components.character_state.with_physics_and_health_state(
-					next_physics_state, next_health_state))
+			var next_health_state := CharacterHealthState.new(current_health)			
+			next_world_state[client_id] = character_state.with_physics_and_health_state(
+				next_physics_state, next_health_state)
 		return next_world_state
 
 	static func __display_character_states(
-		character_state_and_components_per_client_id: Dictionary,
-		next_character_state_per_client_id: Dictionary
+		next_character_state_per_client_id: Dictionary,
+		entity_spawner: EntitySpawner
 	) -> void:
-		for client_id: int in character_state_and_components_per_client_id:
-			var character_state_and_components: ServerCharacterStateAndComponents = (
-				character_state_and_components_per_client_id[client_id])
+		for client_id: int in next_character_state_per_client_id:
 			var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
-			var character_components := character_state_and_components.character_components
+			var character_components := entity_spawner.get_or_spawn_server_character(
+				next_character_state.character_entity_id)
 			var character_transform_state := __extract_transform_state(next_character_state)
 			character_components.third_person_display().display_character_transform(character_transform_state)
 			character_components.first_person_display().display_character_state(
@@ -234,15 +217,15 @@ class ServerGameSimulation:
 	static func __compute_hitscan_ability_results(
 		current_simulation_state: SimulationState,
 		simulation_state_per_server_tick: Dictionary,
-		character_state_and_components_per_client_id: Dictionary
+		entity_spawner: EntitySpawner
 	) -> Array[HitscanResult]:
 		var hitscan_ability_results: Array[HitscanResult] = []
-		for client_id: int in character_state_and_components_per_client_id:
-			var character_state_and_components: ServerCharacterStateAndComponents = (
-				character_state_and_components_per_client_id[client_id])
-			var character_entity_id := character_state_and_components.character_state.character_entity_id
-			var character_components := character_state_and_components.character_components
-			for ability_trigger: InputTrigger in character_state_and_components.character_state.input.input_triggers:
+		for client_id: int in current_simulation_state.character_state_per_client_id:
+			var character_state: ServerCharacterState = (
+				current_simulation_state.character_state_per_client_id[client_id])
+			var character_entity_id := character_state.character_entity_id
+			var character_components := entity_spawner.get_or_spawn_server_character(character_entity_id)
+			for ability_trigger: InputTrigger in character_state.input.input_triggers:
 				var simulation_state_at_time_of_trigger: SimulationState = (
 					simulation_state_per_server_tick[ability_trigger.server_tick_displayed_on_client])
 				var lag_compensated_world_state: Dictionary
@@ -283,17 +266,6 @@ class ServerGameSimulation:
 				other_character_positions_per_entity_id[character_entity_id] = (
 					character_state.physics_state.position())
 		return other_character_positions_per_entity_id
-	
-	class ServerCharacterStateAndComponents:
-		var character_state: ServerCharacterState
-		var character_components: CharacterComponents
-
-		func _init(
-			current_physics_state: ServerCharacterState,
-			character_components: CharacterComponents
-		) -> void:
-			self.character_state = current_physics_state
-			self.character_components = character_components
 
 	class PlayerLifeDeathState:
 		var ticks_until_respawn: int
