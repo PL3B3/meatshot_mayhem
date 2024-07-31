@@ -18,6 +18,9 @@ func get_or_spawn_client_own_character() -> CharacterComponents:
 		client_own_character_ = character_components
 		return character_components
 
+func get_or_spawn_server_character(entity_id: int) -> CharacterComponents:
+	return get_or_spawn_character(entity_id, CONSTANTS.NetworkEntityMode.SERVER)
+
 func get_or_spawn_character(entity_id: int, network_mode: int) -> CharacterComponents:
 	if entity_id in character_components_per_entity_id_:
 		return character_components_per_entity_id_[entity_id]
