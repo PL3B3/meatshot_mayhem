@@ -108,7 +108,7 @@ func __run_game_simulation_tick() -> void:
 			client_state_timeline_.get_current_tick()))
 	
 	__display_own_character(
-		latest_own_character_health_state.health(),
+		latest_own_character_health_state.health,
 		own_character_transform_state, 
 		own_character_components.first_person_display())
 	own_character_components.first_person_display().play_walking_audio_blended_by_speed(own_character_physics_state)

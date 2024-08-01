@@ -1,24 +1,19 @@
-extends RefCounted
-class_name CharacterHealthState
+class_name CharacterHealthState extends RefCounted
 
-const DEFAULT_HEALTH := 100
-static var DEFAULT_HEALTH_STATE := CharacterHealthState.new(DEFAULT_HEALTH)
+static var DEFAULT := CharacterHealthState.new()
 
-var health_: int
+var health: int
 
-func _init(health: int):
-	health_ = health
-
-func health() -> int:
-	return health_
+func _init(health: int = 100) -> void:
+	self.health = health
 
 func serialize_to_stream(serialized_data_stream: StreamPeerBuffer) -> void:
-	serialized_data_stream.put_u8(health_)
+	serialized_data_stream.put_u8(health)
 
 static func consume_and_deserialize(serialized_data_stream: StreamPeerBuffer) -> CharacterHealthState:
 	return CharacterHealthState.new(serialized_data_stream.get_u8())
 
 func _to_string() -> String:
-	return "CharacterHealthState<HEALTH=%s>" % [
-		health_    
+	return "CharacterHealthState<health=%s>" % [
+		health
 	]
