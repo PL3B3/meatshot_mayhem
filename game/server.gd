@@ -74,7 +74,7 @@ class ServerGameSimulation:
 
 		for client_id: int in next_character_state_per_client_id:
 			var next_character_state: ServerCharacterState = next_character_state_per_client_id[client_id]
-			if next_character_state.health_state.health() <= 0:
+			if next_character_state.health_state.health <= 0:
 				next_character_state_per_client_id.erase(client_id)
 				simulation_state_.character_state_per_client_id.erase(client_id)
 				simulation_state_.player_life_death_state_per_client_id[client_id] = (
@@ -169,7 +169,7 @@ class ServerGameSimulation:
 		var randomly_chosen_spawn_point: Vector3 = SPAWN_POINTS[rng.randi() % SPAWN_POINTS.size()]
 		return ServerCharacterState.new(
 			CharacterPhysicsState.new(randomly_chosen_spawn_point, Vector3.ZERO, false), 
-			CharacterHealthState.DEFAULT_HEALTH_STATE,
+			CharacterHealthState.DEFAULT,
 			ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP,
 			InputStateAndTriggers.new(InputState.DEFAULT, []))
 
@@ -186,7 +186,7 @@ class ServerGameSimulation:
 			var character_components := entity_spawner.get_or_spawn_server_character(character_entity_id)
 			var next_physics_state := character_components.movement_body().compute_next_physics_state(
 					character_state.physics_state, character_state.input.input_state)
-			var current_health := character_state.health_state.health()
+			var current_health := character_state.health_state.health
 			for hitscan_result: HitscanResult in hitscan_results:
 				if hitscan_result.hit_entity_id == character_entity_id:
 					current_health -= hitscan_result.damage
@@ -206,7 +206,8 @@ class ServerGameSimulation:
 			var character_transform_state := __extract_transform_state(next_character_state)
 			character_components.third_person_display().display_character_transform(character_transform_state)
 			character_components.first_person_display().display_character_state(
-				character_transform_state, next_character_state.health_state.health())
+				character_transform_state, next_character_state.health_state.health)
+			print("health %s" % next_character_state.health_state)
 
 	static func __extract_transform_state(character_state: ServerCharacterState) -> CharacterTransformState:
 		return CharacterTransformState.new(
