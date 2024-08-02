@@ -7,6 +7,9 @@ var health: int
 func _init(health: int = 100) -> void:
 	self.health = health
 
+func duplicate() -> CharacterHealthState:
+	return CharacterHealthState.new(health)
+
 func serialize_to_stream(serialized_data_stream: StreamPeerBuffer) -> void:
 	serialized_data_stream.put_u8(health)
 

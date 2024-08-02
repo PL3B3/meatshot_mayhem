@@ -87,7 +87,7 @@ class ServerGameSimulation:
 		simulation_state_advanced.emit(tick_, next_character_state_per_client_id)
 		simulation_state_.character_state_per_client_id = next_character_state_per_client_id
 		
-		simulation_state_per_server_tick_[tick_] = simulation_state_.deep_copy()
+		simulation_state_per_server_tick_[tick_] = simulation_state_.duplicate()
 		__clear_stale_simulation_states()
 		tick_ += 1
 
@@ -273,6 +273,9 @@ class ServerGameSimulation:
 
 		func _init(ticks_until_respawn: int = 0) -> void:
 			self.ticks_until_respawn = ticks_until_respawn
+		
+		func duplicate() -> PlayerLifeDeathState:
+			return PlayerLifeDeathState.new(ticks_until_respawn)
 
 	class SimulationState:
 		var next_character_entity_id_: int = 0
@@ -299,11 +302,11 @@ class ServerGameSimulation:
 		func delete_character(client_id: int) -> void:
 			character_state_per_client_id.erase(client_id)
 		
-		func deep_copy() -> SimulationState:
+		func duplicate() -> SimulationState:
 			return SimulationState.new(
 				next_character_entity_id_, 
-				player_life_death_state_per_client_id.duplicate(true), 
-				character_state_per_client_id.duplicate(true))
+				Utils.duplicate_dict(player_life_death_state_per_client_id), 
+				Utils.duplicate_dict(character_state_per_client_id))
 
 class InputSubscriptionsForActiveClients:
 	static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputBuffer: 
@@ -455,6 +458,10 @@ class ServerCharacterState:
 		self.character_entity_id = character_entity_id
 		self.input = input
 	
+	func duplicate() -> ServerCharacterState:
+		return ServerCharacterState.new(
+			physics_state.duplicate(), health_state.duplicate(), character_entity_id, input.duplicate())
+	
 	func with_input(new_client_input: InputStateAndTriggers) -> ServerCharacterState:
 		return ServerCharacterState.new(
 			physics_state,
@@ -495,6 +502,11 @@ class InputStateAndTriggers:
 	func _init(input_state: InputState, input_triggers: Array[InputTrigger]) -> void:
 		self.input_state = input_state
 		self.input_triggers = input_triggers
+	
+	func duplicate() -> InputStateAndTriggers:
+		var duplicated_triggers: Array[InputTrigger]
+		duplicated_triggers.assign(Utils.duplicate_array(input_triggers))
+		return InputStateAndTriggers.new(input_state, duplicated_triggers)
 
 class InputTrigger:
 	var server_tick_displayed_on_client: int
@@ -503,3 +515,6 @@ class InputTrigger:
 	func _init(server_tick_displayed_on_client: int, camera_transform: Transform3D) -> void:
 		self.server_tick_displayed_on_client = server_tick_displayed_on_client
 		self.camera_transform = camera_transform
+	
+	func duplicate() -> InputTrigger:
+		return InputTrigger.new(server_tick_displayed_on_client, camera_transform)

@@ -43,6 +43,9 @@ func _init(
 	direction_ = direction
 	client_tick_ = client_tick
 
+func duplicate() -> InputState:
+	return InputState.new(yaw_, pitch_, is_jumping_, is_slow_walking_, direction_, client_tick_)
+
 func yaw():
 	return yaw_
 

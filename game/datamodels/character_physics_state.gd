@@ -16,6 +16,9 @@ func _init(position: Vector3, velocity: Vector3, is_grounded: bool) -> void:
 	velocity_ = velocity
 	is_grounded_ = is_grounded
 
+func duplicate() -> CharacterPhysicsState:
+	return CharacterPhysicsState.new(position_, velocity_, is_grounded_)
+
 func position() -> Vector3:
 	return position_
 
