@@ -27,3 +27,18 @@ static func default_dict_if_absent(dict: Dictionary, key):
 			existing_dictionary_for_key, key])
 	return existing_dictionary_for_key
 
+# not type safe
+static func duplicate_array(original_array: Array) -> Array:
+	var duplicated_items: Array = []
+	for original_item: Variant in original_array:
+		duplicated_items.append(original_item.duplicate())
+	return duplicated_items
+
+# note type safe. keys must be primitives
+static func duplicate_dict(original_dict: Dictionary) -> Dictionary:
+	var duplicated_dict: Dictionary = {}
+	for original_key: Variant in original_dict:
+		var original_item: Variant = original_dict[original_key]
+		var duplicated_item = original_item.duplicate()
+		duplicated_dict[original_key] = duplicated_item
+	return duplicated_dict
