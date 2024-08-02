@@ -12,6 +12,9 @@ func _init(origin: Vector3, hit_point: Vector3, hit_entity_id: int, damage: int)
 	self.hit_entity_id = hit_entity_id
 	self.damage = damage
 
+func duplicate() -> HitscanResult:
+	return HitscanResult.new(origin, hit_point, hit_entity_id, damage)
+
 func with_origin(new_origin: Vector3) -> HitscanResult:
 	return HitscanResult.new(new_origin, hit_point, hit_entity_id, damage)
 
