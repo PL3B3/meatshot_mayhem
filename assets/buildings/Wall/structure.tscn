@@ -1,11 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=6 format=3 uid="uid://cg6sx703jmjxq"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_515ub"]
 load_path = "res://.godot/imported/structure_planks.png-8330d4c4aec3ab0b79c1ae58764f6b54.ctex"
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_mbjkr"]
 resource_name = "planks"
-albedo_color = Color(1, 1, 1, 1)
 albedo_texture = SubResource("CompressedTexture2D_515ub")
 metallic_specular = 0.2
 roughness = 0.8

@@ -1,7 +1,7 @@
 [gd_scene load_steps=35 format=3 uid="uid://5coqjtlkxkj7"]
 
 [ext_resource type="Environment" uid="uid://cwjnu3fulwik2" path="res://assets/environment_bright.tres" id="1_jlei3"]
-[ext_resource type="Texture2D" uid="uid://b8gkwm2ijeth0" path="res://addons/medieval/overhang_fence_planks.png" id="2_sjecm"]
+[ext_resource type="Texture2D" uid="uid://b8gkwm2ijeth0" path="res://assets/medieval/overhang_fence_planks.png" id="2_sjecm"]
 [ext_resource type="Texture2D" uid="uid://bnop8ebuj8qpy" path="res://external_assets/Pixel Textures Pack 2/Bricks/s2 Brick 02 Grey.png" id="3_i74db"]
 [ext_resource type="Texture2D" uid="uid://cso73p1u6okcs" path="res://assets/cheese.jpg" id="4_17abj"]
 [ext_resource type="PackedScene" path="res://assets/buildings/Tower/tower.tscn" id="5_rjyx0"]
