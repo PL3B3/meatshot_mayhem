@@ -65,7 +65,7 @@ class ServerGameSimulation:
 		__create_character_states_for_living_players_and_notify_clients()
 		__populate_character_states_with_latest_input(latest_input_per_connected_client_id)
 		
-		__compute_hitscan_ability_results(simulation_state_per_server_tick_)
+		__compute_hitscan_ability_results()
 		__compute_next_state_for_characters()
 		__despawn_characters_with_health_less_than_zero()
 
@@ -141,7 +141,7 @@ class ServerGameSimulation:
 			simulation_state_.character_state_per_client_id[client_id_for_existing_character] = (
 				character_state.with_input(latest_client_input))
 
-	func __compute_hitscan_ability_results(simulation_state_per_server_tick: Dictionary) -> void:
+	func __compute_hitscan_ability_results() -> void:
 		var hitscan_ability_results: Array[HitscanResult] = []
 		for client_id: int in simulation_state_.character_state_per_client_id:
 			var character_state: ServerCharacterState = (
@@ -150,7 +150,7 @@ class ServerGameSimulation:
 			var character_components := entity_spawner_.get_or_spawn_server_character(character_entity_id)
 			for ability_trigger: InputTrigger in character_state.input.input_triggers:
 				var simulation_state_at_time_of_trigger: SimulationState = (
-					simulation_state_per_server_tick[ability_trigger.server_tick_displayed_on_client])
+					simulation_state_per_server_tick_[ability_trigger.server_tick_displayed_on_client])
 				var lag_compensated_world_state: Dictionary
 				if simulation_state_at_time_of_trigger != null:
 					lag_compensated_world_state = simulation_state_at_time_of_trigger.character_state_per_client_id
