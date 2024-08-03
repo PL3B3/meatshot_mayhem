@@ -43,24 +43,14 @@ static func from_dict(dict: Dictionary) -> CharacterPhysicsState:
 	)
 
 func serialize_to_stream(serialized_data_stream: StreamPeerBuffer) -> void:
-	serialized_data_stream.put_u16(SerdeUtil.POSITION_AXIS_SERDE.serialize_float_to_u16(position_.x))
-	serialized_data_stream.put_u16(SerdeUtil.POSITION_Y_AXIS_SERDE.serialize_float_to_u16(position_.y))
-	serialized_data_stream.put_u16(SerdeUtil.POSITION_AXIS_SERDE.serialize_float_to_u16(position_.z))
-	serialized_data_stream.put_u16(SerdeUtil.VELOCITY_AXIS_SERDE.serialize_float_to_u16(velocity_.x))
-	serialized_data_stream.put_u16(SerdeUtil.VELOCITY_AXIS_SERDE.serialize_float_to_u16(velocity_.y))
-	serialized_data_stream.put_u16(SerdeUtil.VELOCITY_AXIS_SERDE.serialize_float_to_u16(velocity_.z))
+	serialized_data_stream.put_var(position_)
+	serialized_data_stream.put_var(velocity_)
 	serialized_data_stream.put_u8(int(is_grounded_))
 
 static func consume_and_deserialize(serialized_data_stream: StreamPeerBuffer) -> CharacterPhysicsState:
 	return CharacterPhysicsState.new(
-		Vector3(
-			SerdeUtil.POSITION_AXIS_SERDE.deserialize_float_from_u16(serialized_data_stream.get_u16()),
-			SerdeUtil.POSITION_Y_AXIS_SERDE.deserialize_float_from_u16(serialized_data_stream.get_u16()),
-			SerdeUtil.POSITION_AXIS_SERDE.deserialize_float_from_u16(serialized_data_stream.get_u16())),
-		Vector3(
-			SerdeUtil.VELOCITY_AXIS_SERDE.deserialize_float_from_u16(serialized_data_stream.get_u16()),
-			SerdeUtil.VELOCITY_AXIS_SERDE.deserialize_float_from_u16(serialized_data_stream.get_u16()),
-			SerdeUtil.VELOCITY_AXIS_SERDE.deserialize_float_from_u16(serialized_data_stream.get_u16())),
+		serialized_data_stream.get_var(),
+		serialized_data_stream.get_var(),
 		bool(serialized_data_stream.get_u8()))
 
 func _to_string() -> String:
