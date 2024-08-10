@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://1um3xkvp8pcn"]
+[gd_scene load_steps=11 format=3 uid="uid://1um3xkvp8pcn"]
 
 [ext_resource type="AudioStream" uid="uid://bbmu10d0atafu" path="res://assets/shotgun_shot_bass.ogg" id="1_4ijcn"]
 [ext_resource type="Script" path="res://game/character/shotgun.gd" id="1_8ikm0"]
@@ -55,8 +55,20 @@ tracks/1/keys = {
 }
 tracks/1/use_blend = true
 
+[sub_resource type="Animation" id="Animation_gd2i8"]
+resource_name = "RESET"
+length = 0.001
+tracks/0/type = "position_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("GunModel")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, -0.5)
+
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_2syy2"]
 _data = {
+"RESET": SubResource("Animation_gd2i8"),
 "shoot_first_person": SubResource("Animation_3k0x4"),
 "shoot_third_person": SubResource("Animation_imici")
 }
@@ -114,7 +126,7 @@ unit_size = 20.0
 [node name="ShootAudioPlayer" type="AudioStreamPlayer" parent="."]
 
 [node name="GunModel" type="MeshInstance3D" parent="."]
-transform = Transform3D(-1.1, 0, -1.66095e-07, 0, 1.1, 0, 1.66095e-07, 0, -1.1, 0, 0, -0.141026)
+transform = Transform3D(-1.1, 0, -1.66095e-07, 0, 1.1, 0, 1.66095e-07, 0, -1.1, 0, 0, -0.5)
 cast_shadow = 0
 mesh = SubResource("ArrayMesh_t617q")
 skeleton = NodePath("")
