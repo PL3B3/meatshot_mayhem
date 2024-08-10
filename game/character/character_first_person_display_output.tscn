@@ -17,6 +17,9 @@ load_path = "res://.godot/imported/overhang_fence_planks.png-b338c818a421c5dd7f3
 [sub_resource type="LabelSettings" id="LabelSettings_liqop"]
 font_size = 100
 
+[sub_resource type="Animation" id="Animation_7mnug"]
+resource_name = "RESET"
+
 [sub_resource type="AudioStreamRandomizer" id="AudioStreamRandomizer_4n1he"]
 random_pitch = 1.2
 random_volume_offset_db = 2.0
@@ -61,9 +64,6 @@ tracks/0/keys = {
 }
 tracks/0/use_blend = true
 
-[sub_resource type="Animation" id="Animation_7mnug"]
-resource_name = "RESET"
-
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_k0sm7"]
 _data = {
 "RESET": SubResource("Animation_7mnug"),
@@ -105,7 +105,7 @@ offset_right = 288.0
 offset_bottom = 69.0
 theme_override_colors/font_color = Color(0.92549, 0, 0.54902, 1)
 theme_override_font_sizes/font_size = 50
-text = "CHARACTER"
+text = "HEALTH"
 
 [node name="Crosshair" type="TextureRect" parent="."]
 anchors_preset = 8

@@ -7,6 +7,7 @@ const CHARACTER_SPEED_RUN_THRESHOLD: float = 20.0
 
 @onready var camera_: Camera3D = $Camera3D
 @onready var health_label_: Label = $HealthLabel
+@onready var crosshair_: Control = $Crosshair
 @onready var shotgun_: Shotgun = $Camera3D/Shotgun
 @onready var animation_tree_: AnimationTree = $AnimationTree
 
@@ -35,3 +36,13 @@ func play_fire_gun_animation() -> void:
 
 func get_tracer_origin_position() -> Vector3:
 	return shotgun_.get_tracer_origin_position()
+
+func hide_all_ui_elements_and_models() -> void:
+	health_label_.hide()
+	crosshair_.hide()
+	hide()
+
+func show_all_ui_elements_and_models() -> void:
+	health_label_.show()
+	crosshair_.show()
+	show()

@@ -15,6 +15,7 @@ const TIME_BETWEEN_PROCESS_CALLS_STAT = "time_between_process_calls"
 const NUMBER_OF_REDUNDANT_INPUTS_TO_SEND_TO_SERVER := 1
 const TRIGGER_TRANSFORM_IS_SAMPLED_FROM_BEGINNING_OF_SERVER_TICK := -1
 const ENTITY_INTERPOLATION_LERP_SPEED := 0.5
+const REMOTE_HITSCAN_RAYCASTS_SHOULD_IGNORE_OWN_CHARACTER_WHEN_DEAD := Vector3(0,1000,0)
 const NO_REMOTE_CHARACTER_STATES := {}
 const ENABLE_LOGGING := false
 
@@ -66,40 +67,77 @@ func _process(_delta: float) -> void:
 		network_bus_.quit_to_client_menu()
 
 func _physics_process(_delta: float) -> void:
-	if __should_run_game_simulation():
+	if warmed_up and client_state_timeline_.has_states():
 		__run_game_simulation_tick()
 	ticks_to_keep_running_after_death_ = max(0, ticks_to_keep_running_after_death_ - 1)
 
 func __run_game_simulation_tick() -> void:
 	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
-	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
+	var interpolated_remote_state: QueueItem = __get_latest_queued_authoritative_state_snapshot()
+	var currently_displayed_authoritative_state_tick: int = interpolated_remote_state.tick()
+	var latest_remote_character_state_per_entity_id: Dictionary = interpolated_remote_state.value()
+
+	__display_non_predicted_state(
+		current_state.own_character_state().physics_state().position(), 
+		currently_displayed_authoritative_state_tick, 
+		latest_remote_character_state_per_entity_id)
+	
 	var client_simulation_tick := client_state_timeline_.get_next_tick()
 	var latest_input: InputState = input_handler_.latest_input(client_simulation_tick)
-	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state().physics_state()
-	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
-		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
-	
-	var interpolated_remote_entity_states: QueueItem = __get_latest_queued_authoritative_state_snapshot()
-	var latest_remote_character_state_per_entity_id: Dictionary = interpolated_remote_entity_states.value()
-	
-	var latest_own_character_health_state: CharacterHealthState
-	if latest_authoritative_health_state == null:
-		latest_own_character_health_state = current_state.own_character_state().health_state()
-	else:
-		latest_own_character_health_state = latest_authoritative_health_state
+	__send_recent_inputs_to_server(latest_input)
 
-	var remote_character_resources: Array[RemoteCharacterResource] = []
-	var remote_character_latest_position_per_entity_id: Dictionary = {}
-	for remote_character_entity_id in latest_remote_character_state_per_entity_id:
+	var next_own_character_state: ClientOwnCharacterState
+	if is_alive_ or ticks_to_keep_running_after_death_ > 0:
+		next_own_character_state = __calculate_and_display_client_predicted_state(
+			current_state, 
+			currently_displayed_authoritative_state_tick, 
+			latest_remote_character_state_per_entity_id, 
+			latest_input)
+	else:
+		var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
+		own_character_components.first_person_display().hide_all_ui_elements_and_models()
+		next_own_character_state = current_state.own_character_state()
+	
+	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
+		next_own_character_state, latest_remote_character_state_per_entity_id)
+	client_state_timeline_.add_next_state(next_state)
+	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
+
+func __display_non_predicted_state(
+	own_character_position: Vector3,
+	authoritative_state_tick: int, 
+	latest_remote_character_state_per_entity_id: Dictionary
+	) -> void:
+	for remote_character_entity_id: int in latest_remote_character_state_per_entity_id:
 		var remote_character_state: CharacterTransformState = (
 			latest_remote_character_state_per_entity_id[remote_character_entity_id])
 		var remote_character_components: CharacterComponents = (
 			entity_spawner_.get_or_spawn_character(remote_character_entity_id, CONSTANTS.NetworkEntityMode.OTHER_CLIENT))
-		var remote_character_resource: RemoteCharacterResource = RemoteCharacterResource.new(
-			remote_character_state, remote_character_components.third_person_display())
-		remote_character_resources.push_back(remote_character_resource)
-		remote_character_latest_position_per_entity_id[remote_character_entity_id] = remote_character_state.position()
+		remote_character_components.third_person_display().display_character_transform(remote_character_state)
+	var own_character_position_for_remote_hitscan_tracer_collisions: Vector3 = (
+		own_character_position if is_alive_ else REMOTE_HITSCAN_RAYCASTS_SHOULD_IGNORE_OWN_CHARACTER_WHEN_DEAD)
+	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
+		own_character_position_for_remote_hitscan_tracer_collisions, 
+		latest_remote_character_state_per_entity_id, 
+		authoritative_state_tick)
+	__draw_bullet_tracers(remote_character_hitscan_ability_results)
+	__draw_bullet_hits(remote_character_hitscan_ability_results)
 
+func __calculate_and_display_client_predicted_state(
+	current_state: ClientStateSnapshot,
+	currently_displayed_authoritative_state_tick: int, 
+	authoritative_remote_character_state_per_entity_id: Dictionary,
+	latest_input: InputState
+	) -> ClientOwnCharacterState:
+	var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
+	var own_character_physics_state: CharacterPhysicsState = current_state.own_character_state().physics_state()
+	var own_character_transform_state: CharacterTransformState = CharacterTransformState.new(
+		own_character_physics_state.position(), latest_input.pitch(), latest_input.yaw())
+	var own_character_health_state: CharacterHealthState = (
+		current_state.own_character_state().health_state() 
+		if latest_authoritative_health_state == null 
+		else latest_authoritative_health_state)
+	
 	var optionally_reconciled_own_character_physics_state: CharacterPhysicsState = (
 		__reconcile_own_character_physics_state_with_authoritative_state(
 			latest_reconciliation_data_, 
@@ -107,65 +145,45 @@ func __run_game_simulation_tick() -> void:
 			own_character_components.movement_body(), 
 			client_state_timeline_.get_current_tick()))
 	
-	__display_own_character(
-		latest_own_character_health_state.health,
-		own_character_transform_state, 
-		own_character_components.first_person_display())
-	own_character_components.first_person_display().play_walking_audio_blended_by_speed(own_character_physics_state)
-	__display_remote_characters(remote_character_resources)
-	var next_own_character_physics_state: CharacterPhysicsState = __compute_next_physics_state(
-		optionally_reconciled_own_character_physics_state, 
-		own_character_components.movement_body(), 
-		latest_input)
+	var first_person_display := own_character_components.first_person_display()
+	first_person_display.display_character_state(own_character_transform_state, own_character_health_state.health)
+	first_person_display.play_walking_audio_blended_by_speed(own_character_physics_state)
+	first_person_display.show_all_ui_elements_and_models()
+
+	var next_own_character_physics_state := own_character_components.movement_body().compute_next_physics_state(
+		optionally_reconciled_own_character_physics_state, latest_input)
 	var hitscan_ability_results: Array[HitscanResult] = []
 	var ability_trigger_result := own_character_components.ability_trigger_state_machine().compute_trigger_result(
 		current_state.own_character_state().ability_trigger_state(), latest_input)
 	if ability_trigger_result.is_triggered:
-		var current_camera_transform := (
-			own_character_components.first_person_display().compute_camera_transform(own_character_transform_state))
+		var current_camera_transform := first_person_display.compute_camera_transform(own_character_transform_state)
 		var ability_result := own_character_components.ability_action().perform_ability(
-			current_camera_transform, remote_character_latest_position_per_entity_id)
-		own_character_components.first_person_display().play_fire_gun_animation()
+			current_camera_transform, 
+			__extract_remote_character_positions(authoritative_remote_character_state_per_entity_id))
+		first_person_display.play_fire_gun_animation()
 		var gun_model_tracer_origin_position := (
-				own_character_components.first_person_display().get_tracer_origin_position())
+			first_person_display.get_tracer_origin_position())
 		var hitscan_results_updated_with_origin_at_gun_model: Array[HitscanResult] = []
 		for hitscan_result_originating_from_camera_origin: HitscanResult in ability_result.hitscan_results:
 			hitscan_results_updated_with_origin_at_gun_model.append(
 				hitscan_result_originating_from_camera_origin.with_origin(gun_model_tracer_origin_position))
 		hitscan_ability_results.append_array(hitscan_results_updated_with_origin_at_gun_model)
-		network_bus_.send_trigger_to_server(current_camera_transform, interpolated_remote_entity_states.tick())
-	
-	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
-		own_character_physics_state.position(), 
-		latest_remote_character_state_per_entity_id, 
-		interpolated_remote_entity_states.tick())
-	hitscan_ability_results.append_array(remote_character_hitscan_ability_results)
-	
+		network_bus_.send_trigger_to_server(current_camera_transform, currently_displayed_authoritative_state_tick)
+
 	__draw_bullet_tracers(hitscan_ability_results)
 	__draw_bullet_hits(hitscan_ability_results)
 
-	var next_own_character_state := ClientOwnCharacterState.new(
+	return ClientOwnCharacterState.new(
 		next_own_character_physics_state, 
 		ability_trigger_result.next_trigger_state, 
-		latest_own_character_health_state,
+		own_character_health_state,
 		latest_input)
-	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
-		next_own_character_state, latest_remote_character_state_per_entity_id)
-	client_state_timeline_.add_next_state(next_state)
-	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
-	__send_recent_inputs_to_server(latest_input)
-
-func __should_run_game_simulation() -> bool:
-	return (
-		warmed_up and
-		client_state_timeline_.has_states() and
-		(is_alive_ or ticks_to_keep_running_after_death_ > 0))
 
 func __perform_remote_character_abilities(
 	own_character_position: Vector3, 
 	latest_remote_character_state_per_entity_id: Dictionary,
 	currently_displayed_server_tick: int
-) -> Array[HitscanResult]:
+	) -> Array[HitscanResult]:
 	var remote_character_hitscan_ability_results: Array[HitscanResult] = []
 	var unhandled_pending_triggers: Array[RemoteCharacterAbilityTrigger] = []
 	for pending_ability_trigger: RemoteCharacterAbilityTrigger in pending_remote_character_triggers_:
@@ -200,7 +218,7 @@ func __extract_positions_for_characters_except_remote_character(
 	own_character_position: Vector3,
 	latest_remote_character_state_per_entity_id: Dictionary,
 	remote_character_entity_id_to_exclude: int
-) -> Dictionary:
+	) -> Dictionary:
 	var positions_for_all_but_specified_character: Dictionary = {}
 	positions_for_all_but_specified_character[RaycastUtils.NO_ENTITY_HIT] = own_character_position
 	for remote_character_entity_id: int in latest_remote_character_state_per_entity_id:
@@ -242,7 +260,7 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 	predicted_player_physics_state: CharacterPhysicsState, 
 	character_movement_calculator: CharacterMovementActuator,
 	current_tick: int
-) -> CharacterPhysicsState:
+	) -> CharacterPhysicsState:
 	if optional_reconciliation_data.is_present():
 		var authoritative_physics_state_and_tick: ReconciliationData = optional_reconciliation_data.value()
 		var reconciliation_replay_start_tick
@@ -274,7 +292,7 @@ func __reconcile_own_character_physics_state_with_authoritative_state(
 func __correct_predicted_physics_state_towards_simulated_authoritative_state(
 	predicted_state: CharacterPhysicsState, 
 	simulated_state: CharacterPhysicsState
-) -> CharacterPhysicsState:
+	) -> CharacterPhysicsState:
 	var position_error: Vector3 = simulated_state.position() - predicted_state.position()
 	var velocity_error: Vector3 = simulated_state.velocity() - predicted_state.velocity()
 	__log(
@@ -314,7 +332,7 @@ func __on_triggered_remote_character_ability(
 	remote_character_entity_id: int,
 	camera_transform: Transform3D, 
 	server_tick: int
-) -> void: 
+	) -> void: 
 	pending_remote_character_triggers_.append(
 		RemoteCharacterAbilityTrigger.new(
 			remote_character_entity_id,
@@ -327,10 +345,7 @@ func __on_death() -> void:
 	ticks_to_keep_running_after_death_ = 1
 
 func __on_respawn() -> void:
-	entity_spawner_.despawn_all_entities()
-	pending_remote_character_triggers_.clear()
 	input_handler_.reset_view_angle()
-	client_remote_state_buffer_.reset()
 	death_screen_.hide()
 	is_alive_ = true
 
@@ -344,32 +359,22 @@ func __log(format_string: String, args: Array[Variant] = []) -> void:
 
 static func __is_trigger_at_or_before_current_displayed_tick(
 	trigger_server_tick: int, displayed_server_tick: int
-) -> bool:
+	) -> bool:
 	return displayed_server_tick >= trigger_server_tick + TRIGGER_TRANSFORM_IS_SAMPLED_FROM_BEGINNING_OF_SERVER_TICK
 
-static func __compute_next_physics_state(
-	current_physics_state: CharacterPhysicsState,
-	movement_calculator: CharacterMovementActuator,
-	player_input: InputState
-) -> CharacterPhysicsState:
-	return movement_calculator.compute_next_physics_state(current_physics_state, player_input)
-
-static func __display_own_character(
-	current_health: int,
-	character_transform: CharacterTransformState,
-	first_person_display: CharacterFirstPersonOutput) -> void:
-	first_person_display.display_character_state(character_transform, current_health)
-
-static func __display_remote_characters(remote_character_resources: Array[RemoteCharacterResource]):
-	for remote_character_resource in remote_character_resources:
-		remote_character_resource.third_person_display().display_character_transform(
-			remote_character_resource.transform_state())
+static func __extract_remote_character_positions(remote_character_state_per_entity_id: Dictionary) -> Dictionary:
+	var remote_character_position_per_entity_id: Dictionary = {}
+	for remote_character_entity_id: int in remote_character_state_per_entity_id:
+		var remote_character_state: CharacterTransformState = (
+			remote_character_state_per_entity_id[remote_character_entity_id])
+		remote_character_position_per_entity_id[remote_character_entity_id] = remote_character_state.position()
+	return remote_character_position_per_entity_id
 
 static func __replay_physics_computation_using_inputs(
 	initial_player_state: CharacterPhysicsState,
 	inputs_to_replay: Array[InputState],
 	movement_calculator: CharacterMovementActuator
-) -> CharacterPhysicsState:
+	) -> CharacterPhysicsState:
 	var simulation_state: CharacterPhysicsState = initial_player_state
 	for simulation_input in inputs_to_replay:
 		simulation_state = movement_calculator.compute_next_physics_state(simulation_state, simulation_input)
@@ -393,20 +398,6 @@ class ReconciliationData:
 	
 	func client_tick() -> int:
 		return client_tick_
-
-class RemoteCharacterResource:
-	var transform_state_
-	var third_person_display_
-
-	func _init(transform_state, third_person_display):
-		transform_state_ = transform_state
-		third_person_display_ = third_person_display
-	
-	func transform_state() -> CharacterTransformState:
-		return transform_state_
-	
-	func third_person_display() -> CharacterThirdPersonDisplay:
-		return third_person_display_
 
 class RemoteCharacterAbilityTrigger:
 	var remote_character_entity_id: int

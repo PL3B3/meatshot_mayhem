@@ -24,13 +24,13 @@ func _physics_process(_delta: float) -> void:
 	game_simulation_.advance_simulation(latest_input_per_connected_client_id)
 
 class ServerGameSimulation:
-	signal simulation_state_advanced(tick: int, current_simulation_state: Dictionary)
+	signal simulation_state_advanced(tick: int, current_simulation_state: SimulationState)
 
 	const OVERWRITE_EXISTING = true
 	const RESPAWN_TIME_IN_TICKS := 300
 	const ENTITY_ID_WILL_BE_SET_UPON_ADDING_TO_STATE_MAP := 0
 	const SPAWN_POINT_HORIZONTAL_OFFSET := 40.0
-	const SPAWN_POINT_VERTICAL_OFFSET := 15.0
+	const SPAWN_POINT_VERTICAL_OFFSET := 2.5
 	const SPAWN_POINTS := [
 		Vector3(SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, SPAWN_POINT_HORIZONTAL_OFFSET),
 		Vector3(SPAWN_POINT_HORIZONTAL_OFFSET, SPAWN_POINT_VERTICAL_OFFSET, -SPAWN_POINT_HORIZONTAL_OFFSET),
@@ -76,7 +76,7 @@ class ServerGameSimulation:
 		__despawn_entities_not_in_simulation_state()
 		__replicate_ability_trigger_on_remote_characters()
 		
-		simulation_state_advanced.emit(tick_, simulation_state_.character_state_per_client_id)
+		simulation_state_advanced.emit(tick_, simulation_state_)
 		simulation_state_per_server_tick_[tick_] = simulation_state_.duplicate()
 		__clear_stale_simulation_states()
 		tick_ += 1
@@ -264,42 +264,42 @@ class ServerGameSimulation:
 		func duplicate() -> PlayerLifeDeathState:
 			return PlayerLifeDeathState.new(ticks_until_respawn)
 
-	class SimulationState:
-		var next_character_entity_id_: int = 0
+class SimulationState:
+	var next_character_entity_id_: int = 0
 
-		var player_life_death_state_per_client_id: Dictionary = {}
-		var character_state_per_client_id: Dictionary = {}
-		var hitscan_results: Array[HitscanResult] = []
+	var player_life_death_state_per_client_id: Dictionary = {}
+	var character_state_per_client_id: Dictionary = {}
+	var hitscan_results: Array[HitscanResult] = []
 
-		func _init(
-			next_character_entity_id_: int = 0, 
-			player_life_death_state_per_client_id: Dictionary = {}, 
-			character_state_per_client_id: Dictionary = {},
-			hitscan_results: Array[HitscanResult] = []
-		) -> void:
-			self.next_character_entity_id_ = next_character_entity_id_
-			self.player_life_death_state_per_client_id = player_life_death_state_per_client_id
-			self.character_state_per_client_id = character_state_per_client_id
-			self.hitscan_results = hitscan_results
+	func _init(
+		next_character_entity_id_: int = 0, 
+		player_life_death_state_per_client_id: Dictionary = {}, 
+		character_state_per_client_id: Dictionary = {},
+		hitscan_results: Array[HitscanResult] = []
+	) -> void:
+		self.next_character_entity_id_ = next_character_entity_id_
+		self.player_life_death_state_per_client_id = player_life_death_state_per_client_id
+		self.character_state_per_client_id = character_state_per_client_id
+		self.hitscan_results = hitscan_results
 
-		func create_character(client_id: int, state: ServerCharacterState) -> void:
-			assert(
-				client_id not in character_state_per_client_id, 
-				"Attempting to create character for client %d which already has character" % client_id)
-			character_state_per_client_id[client_id] = state.with_entity_id(next_character_entity_id_)
-			next_character_entity_id_ += 1
-		
-		func delete_character(client_id: int) -> void:
-			character_state_per_client_id.erase(client_id)
-		
-		func duplicate() -> SimulationState:
-			var duplicated_hitscan_results: Array[HitscanResult] = []
-			duplicated_hitscan_results.assign(Utils.duplicate_array(hitscan_results))
-			return SimulationState.new(
-				next_character_entity_id_, 
-				Utils.duplicate_dict(player_life_death_state_per_client_id), 
-				Utils.duplicate_dict(character_state_per_client_id),
-				duplicated_hitscan_results)
+	func create_character(client_id: int, state: ServerCharacterState) -> void:
+		assert(
+			client_id not in character_state_per_client_id, 
+			"Attempting to create character for client %d which already has character" % client_id)
+		character_state_per_client_id[client_id] = state.with_entity_id(next_character_entity_id_)
+		next_character_entity_id_ += 1
+	
+	func delete_character(client_id: int) -> void:
+		character_state_per_client_id.erase(client_id)
+	
+	func duplicate() -> SimulationState:
+		var duplicated_hitscan_results: Array[HitscanResult] = []
+		duplicated_hitscan_results.assign(Utils.duplicate_array(hitscan_results))
+		return SimulationState.new(
+			next_character_entity_id_, 
+			Utils.duplicate_dict(player_life_death_state_per_client_id), 
+			Utils.duplicate_dict(character_state_per_client_id),
+			duplicated_hitscan_results)
 
 class InputSubscriptionsForActiveClients:
 	static var CLIENT_INPUT_BUFFER_FACTORY: Callable = func(x: int) -> OrderedInputBuffer: 
@@ -360,9 +360,11 @@ class ServerToClientStateSnapshotExporter:
 
 	static var EMPTY_ABILITY_TRIGGER_STATE := CharacterAbilityTriggerState.new(0)
 
-	func export_state_snapshots_to_clients(server_tick: int, next_character_state_per_client_id: Dictionary) -> void:
-		var data_to_export_per_client := __compile_data_to_export_per_client(next_character_state_per_client_id)
-		for client_id: int in data_to_export_per_client:
+	func export_state_snapshots_to_clients(server_tick: int, simulation_state: SimulationState) -> void:
+		var data_to_export_per_client := __compile_data_to_export_per_client(
+			simulation_state.character_state_per_client_id)
+		var all_connected_client_ids := simulation_state.player_life_death_state_per_client_id.keys()
+		for client_id: int in all_connected_client_ids:
 			__export_state_snapshot_to_client(client_id, server_tick, data_to_export_per_client)
 	
 	func __export_state_snapshot_to_client(
@@ -370,16 +372,27 @@ class ServerToClientStateSnapshotExporter:
 		server_tick: int, 
 		data_to_export_per_client: Dictionary
 	) -> void:
-		var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
 		var remote_character_state_per_entity: Dictionary = __extract_states_for_remote_characters(
 			data_to_export_per_client, client_id)
-		var client_own_character_state := ClientOwnCharacterState.new(
-			client_snapshot_data.physics_state, 
-			EMPTY_ABILITY_TRIGGER_STATE, 
-			client_snapshot_data.health_state,
-			InputState.DEFAULT)
+		var client_own_character_state: ClientOwnCharacterState
+		var client_input_tick_for_exported_state: int
+		if client_id in data_to_export_per_client:
+			var client_snapshot_data: PerClientExportedData = data_to_export_per_client[client_id]
+			client_input_tick_for_exported_state = client_snapshot_data.client_tick
+			client_own_character_state = ClientOwnCharacterState.new(
+				client_snapshot_data.physics_state, 
+				EMPTY_ABILITY_TRIGGER_STATE, 
+				client_snapshot_data.health_state,
+				InputState.DEFAULT)
+		else:
+			client_input_tick_for_exported_state = -1
+			client_own_character_state = ClientOwnCharacterState.new(
+				CharacterPhysicsState.new(Vector3.ZERO, Vector3.ZERO, false), 
+				EMPTY_ABILITY_TRIGGER_STATE, 
+				CharacterHealthState.new(0),
+				InputState.DEFAULT)
 		var state_snapshot_for_client := ServerToClientStateSnapshotMessage.new(
-			client_snapshot_data.client_tick, 
+			client_input_tick_for_exported_state, 
 			ClientStateSnapshot.new(client_own_character_state, remote_character_state_per_entity))
 		export_state_snapshot.emit(client_id, server_tick, state_snapshot_for_client)
 
