@@ -8,24 +8,24 @@ static func interpolate_remote_state_snapshots(
 	var interpolated_states := {}
 	for remote_character_entity_id: int in target_remote_state_snapshot:
 		var target_remote_character_state: CharacterTransformState = (
-            target_remote_state_snapshot[remote_character_entity_id])
+			target_remote_state_snapshot[remote_character_entity_id])
 		if remote_character_entity_id in source_remote_state_snapshot:
 			var source_remote_character_state: CharacterTransformState = (
-                source_remote_state_snapshot[remote_character_entity_id])
+				source_remote_state_snapshot[remote_character_entity_id])
 			interpolated_states[remote_character_entity_id] = (
-                StateInterpolationUtils.interpolate_character_transform_states(
-                    source_remote_character_state,target_remote_character_state, interp_fraction))
+				StateInterpolationUtils.interpolate_character_transform_states(
+					source_remote_character_state,target_remote_character_state, interp_fraction))
 		else:
 			interpolated_states[remote_character_entity_id] = target_remote_character_state
 	return interpolated_states
 
 static func interpolate_character_transform_states(
-    source_transform_state: CharacterTransformState,
-    target_transform_state: CharacterTransformState, 
-    interp_fraction: float
+	source_transform_state: CharacterTransformState,
+	target_transform_state: CharacterTransformState, 
+	interp_fraction: float
 ) -> CharacterTransformState:
 	var source_view_rotation_in_euler_angles := Vector3(
-        deg_to_rad(source_transform_state.pitch()), deg_to_rad(source_transform_state.yaw()), 0)
+		deg_to_rad(source_transform_state.pitch()), deg_to_rad(source_transform_state.yaw()), 0)
 	var source_view_rotation_quaternion := Quaternion.from_euler(source_view_rotation_in_euler_angles)
 
 	var target_view_rotation_in_euler_angles := Vector3(

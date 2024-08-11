@@ -1,7 +1,6 @@
-[gd_scene load_steps=5 format=3 uid="uid://dbbfwqe04glnk"]
+[gd_scene load_steps=4 format=3 uid="uid://dbbfwqe04glnk"]
 
 [ext_resource type="Script" path="res://game/server.gd" id="1_nwq0y"]
-[ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://game/network_messenger.tscn" id="4_570yk"]
 [ext_resource type="PackedScene" uid="uid://cdeofkdnlceq7" path="res://game/simple_dm_map.tscn" id="4_c6508"]
 [ext_resource type="PackedScene" uid="uid://df8ewfg0kmle6" path="res://game/entity_spawner.tscn" id="4_sxneu"]
 
@@ -22,8 +21,6 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 10
 theme_override_font_sizes/font_size = 50
 text = "SERVER"
-
-[node name="NetworkMessenger" parent="." instance=ExtResource("4_570yk")]
 
 [node name="EntitySpawner" parent="." instance=ExtResource("4_sxneu")]
 
