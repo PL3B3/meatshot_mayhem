@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://c8jh8ru1xis61"]
+[gd_scene load_steps=19 format=3 uid="uid://c8jh8ru1xis61"]
 
 [ext_resource type="Script" path="res://game/character/character_first_person_display_output.gd" id="1_3sshd"]
 [ext_resource type="Texture2D" uid="uid://b7g6q3dcwtppr" path="res://assets/crosshair.png" id="2_edoxe"]
@@ -10,12 +10,6 @@
 [ext_resource type="AudioStream" uid="uid://cxdpg7sonfvih" path="res://assets/step_4.ogg" id="8_tw1nk"]
 [ext_resource type="AudioStream" uid="uid://b48md8gl33mq" path="res://assets/step_5.ogg" id="9_5c1a7"]
 [ext_resource type="AudioStream" uid="uid://drkdp0ys6itdt" path="res://assets/step_6.ogg" id="10_nne5w"]
-
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_8nkgc"]
-load_path = "res://.godot/imported/overhang_fence_planks.png-b338c818a421c5dd7f3cba6b0cd399bc.ctex"
-
-[sub_resource type="LabelSettings" id="LabelSettings_liqop"]
-font_size = 100
 
 [sub_resource type="Animation" id="Animation_7mnug"]
 resource_name = "RESET"
@@ -79,7 +73,6 @@ animation = &"footsteps"
 animation = &"RESET"
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_px44s"]
-graph_offset = Vector2(-231.991, 63.1335)
 nodes/BlendResetToFootstepsAudio/node = SubResource("AnimationNodeBlend2_6fy3x")
 nodes/BlendResetToFootstepsAudio/position = Vector2(480, 140)
 nodes/footsteps/node = SubResource("AnimationNodeAnimation_q40xg")
@@ -122,29 +115,6 @@ grow_vertical = 2
 scale = Vector2(0.05, 0.05)
 pivot_offset = Vector2(512, 512)
 texture = ExtResource("2_edoxe")
-
-[node name="DeathScreen" type="TextureRect" parent="."]
-visible = false
-modulate = Color(1, 1, 1, 0.282353)
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-texture = SubResource("CompressedTexture2D_8nkgc")
-stretch_mode = 1
-
-[node name="YouAreDead" type="Label" parent="DeathScreen"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "YOU ARE DEAD"
-label_settings = SubResource("LabelSettings_liqop")
-horizontal_alignment = 1
-vertical_alignment = 1
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
 volume_db = -15.0

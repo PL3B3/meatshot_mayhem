@@ -23,8 +23,6 @@ theme_override_constants/outline_size = 10
 theme_override_font_sizes/font_size = 50
 text = "SERVER"
 
-[node name="Spawns" type="Node" parent="."]
-
 [node name="NetworkMessenger" parent="." instance=ExtResource("4_570yk")]
 
 [node name="EntitySpawner" parent="." instance=ExtResource("4_sxneu")]

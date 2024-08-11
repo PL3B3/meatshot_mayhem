@@ -936,10 +936,10 @@ transform = Transform3D(4, 0, 0, 0, 10, 0, 0, 0, 4, -8, 11, 12)
 transform = Transform3D(4, 0, 0, 0, 11, 0, 0, 0, 4, 8, 15, 5)
 
 [node name="Block26" parent="Obstacles" instance=ExtResource("19_hcnqb")]
-transform = Transform3D(3.38444, -6.90575, -0.407857, 2.12614, 10.7447, 0.937088, -0.158256, -3.33192, 3.86724, 9.5744, 13.6622, 5.79465)
+transform = Transform3D(3.38444, -6.90575, -0.407857, 2.12614, 10.7447, 0.937088, -0.158256, -3.33192, 3.86724, 7.97883, 13.6622, 4.4497)
 
 [node name="Block27" parent="Obstacles" instance=ExtResource("19_hcnqb")]
-transform = Transform3D(0.00649438, -5.55442, -3.45259, 3.99409, -0.506826, 0.11533, -0.217314, -9.48112, 2.0165, 6, 10, 7)
+transform = Transform3D(0.00649438, -4.18145, -3.45259, 3.99409, -0.381546, 0.11533, -0.217314, -7.13752, 2.0165, 5.08281, 10.0417, 6.38301)
 
 [node name="Block24" parent="Obstacles" instance=ExtResource("19_hcnqb")]
 transform = Transform3D(4, 0, 0, 0, 10, 0, 0, 0, 4, -8, 11, 12)

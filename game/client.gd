@@ -22,7 +22,7 @@ const ENABLE_LOGGING := false
 @onready var input_handler_: ClientInputHandler = $ClientInputHandler
 @onready var debug_label_: Label = $DebugLabel
 @onready var entity_spawner_: EntitySpawner = $EntitySpawner
-@onready var death_screen_: Control = $DeathScreen
+@onready var death_display_: ClientDeathDisplay = $ClientDeathDisplay
 
 var network_bus_: NetworkMessageAndEventBus
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
@@ -85,6 +85,9 @@ func __run_game_simulation_tick() -> void:
 	var client_simulation_tick := client_state_timeline_.get_next_tick()
 	var latest_input: InputState = input_handler_.latest_input(client_simulation_tick)
 	__send_recent_inputs_to_server(latest_input)
+
+	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
+	tracer_displayer.display_and_update_tracers()
 
 	var next_own_character_state: ClientOwnCharacterState
 	if is_alive_ or ticks_to_keep_running_after_death_ > 0:
@@ -233,7 +236,6 @@ func __draw_bullet_tracers(hitscan_results: Array[HitscanResult]) -> void:
 	var tracer_displayer := entity_spawner_.get_or_create_tracer_displayer()
 	for hitscan_result: HitscanResult in hitscan_results:
 		tracer_displayer.add_tracer(hitscan_result.origin, hitscan_result.hit_point)
-	tracer_displayer.display_and_update_tracers()
 
 func __draw_bullet_hits(hitscan_results: Array[HitscanResult]) -> void:
 	var debug_sphere_displayer := entity_spawner_.get_or_create_debug_sphere_displayer()
@@ -340,13 +342,13 @@ func __on_triggered_remote_character_ability(
 			server_tick))
 
 func __on_death() -> void:
-	death_screen_.show()
-	is_alive_ = false
+	death_display_.play_death_animation()
 	ticks_to_keep_running_after_death_ = 1
+	is_alive_ = false
 
 func __on_respawn() -> void:
+	death_display_.hide_death_display()
 	input_handler_.reset_view_angle()
-	death_screen_.hide()
 	is_alive_ = true
 
 func __on_server_disconnected() -> void:

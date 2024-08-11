@@ -4,6 +4,17 @@
 [ext_resource type="Script" path="res://game/character/shotgun.gd" id="1_8ikm0"]
 [ext_resource type="Texture2D" uid="uid://dilq7sigc0lxm" path="res://assets/DemoCharacterModel_GunTexture.png" id="3_tgevm"]
 
+[sub_resource type="Animation" id="Animation_gd2i8"]
+resource_name = "RESET"
+length = 0.001
+tracks/0/type = "position_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("GunModel")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, -0.5)
+
 [sub_resource type="Animation" id="Animation_3k0x4"]
 resource_name = "shoot_first_person"
 step = 0.05
@@ -54,17 +65,6 @@ tracks/1/keys = {
 "times": PackedFloat32Array(0)
 }
 tracks/1/use_blend = true
-
-[sub_resource type="Animation" id="Animation_gd2i8"]
-resource_name = "RESET"
-length = 0.001
-tracks/0/type = "position_3d"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath("GunModel")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
-tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, -0.5)
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_2syy2"]
 _data = {

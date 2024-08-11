@@ -1,0 +1,92 @@
+[gd_scene load_steps=8 format=3 uid="uid://c81hmgxgnhrjb"]
+
+[ext_resource type="AudioStream" uid="uid://di317k1qmcrbf" path="res://assets/death_bell.ogg" id="1_28fkk"]
+[ext_resource type="Script" path="res://game/client_death_display.gd" id="1_ecc2r"]
+
+[sub_resource type="Gradient" id="Gradient_wkas1"]
+offsets = PackedFloat32Array(0)
+colors = PackedColorArray(0, 0, 0, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ia1ny"]
+gradient = SubResource("Gradient_wkas1")
+
+[sub_resource type="LabelSettings" id="LabelSettings_3jujc"]
+line_spacing = 100.0
+font_size = 120
+
+[sub_resource type="Animation" id="Animation_3s0lt"]
+resource_name = "death_screen_fade_in"
+length = 4.5
+tracks/0/type = "audio"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("DeathAudioStreamPlayer")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"clips": [{
+"end_offset": 0.0,
+"start_offset": 0.0,
+"stream": ExtResource("1_28fkk")
+}],
+"times": PackedFloat32Array(0)
+}
+tracks/0/use_blend = true
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".:modulate")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 2),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Color(1, 1, 1, 0.0666667), Color(1, 1, 1, 0.729412)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_a3san"]
+_data = {
+"death_screen_fade_in": SubResource("Animation_3s0lt")
+}
+
+[node name="ClientDeathDisplay" type="Control"]
+visible = false
+modulate = Color(1, 1, 1, 0.729412)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ecc2r")
+
+[node name="DeathScreen" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("GradientTexture1D_ia1ny")
+stretch_mode = 1
+
+[node name="YouAreDead" type="Label" parent="DeathScreen"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "YOU ARE DEAD"
+label_settings = SubResource("LabelSettings_3jujc")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DeathScreenAnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_a3san")
+}
+
+[node name="DeathAudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+volume_db = -5.0

@@ -1,22 +1,14 @@
-[gd_scene load_steps=8 format=3 uid="uid://clb01f0ifogre"]
+[gd_scene load_steps=7 format=3 uid="uid://clb01f0ifogre"]
 
 [ext_resource type="Script" path="res://game/client.gd" id="1_x1e1o"]
 [ext_resource type="PackedScene" uid="uid://b43a0dnmkibyw" path="res://game/client_input_handler.tscn" id="4_53bko"]
 [ext_resource type="PackedScene" uid="uid://cdeofkdnlceq7" path="res://game/simple_dm_map.tscn" id="5_6iepc"]
 [ext_resource type="PackedScene" uid="uid://cmc8wrkuejr2u" path="res://game/network_messenger.tscn" id="5_ilfw4"]
+[ext_resource type="PackedScene" uid="uid://c81hmgxgnhrjb" path="res://game/client_death_display.tscn" id="5_qn3gn"]
 [ext_resource type="PackedScene" uid="uid://df8ewfg0kmle6" path="res://game/entity_spawner.tscn" id="5_w3vlx"]
-
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_8nkgc"]
-load_path = "res://.godot/imported/overhang_fence_planks.png-b338c818a421c5dd7f3cba6b0cd399bc.ctex"
-
-[sub_resource type="LabelSettings" id="LabelSettings_hfiku"]
-line_spacing = 100.0
-font_size = 120
 
 [node name="NetworkRoot" type="Node"]
 script = ExtResource("1_x1e1o")
-
-[node name="Spawns" type="Node" parent="."]
 
 [node name="ClientInputHandler" parent="." instance=ExtResource("4_53bko")]
 
@@ -39,27 +31,6 @@ text = "CLIENT"
 
 [node name="EntitySpawner" parent="." instance=ExtResource("5_w3vlx")]
 
-[node name="DeathScreen" type="TextureRect" parent="."]
-visible = false
-modulate = Color(1, 1, 1, 0.52549)
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-texture = SubResource("CompressedTexture2D_8nkgc")
-stretch_mode = 1
-
-[node name="YouAreDead" type="Label" parent="DeathScreen"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "YOU ARE DEAD"
-label_settings = SubResource("LabelSettings_hfiku")
-horizontal_alignment = 1
-vertical_alignment = 1
+[node name="ClientDeathDisplay" parent="." instance=ExtResource("5_qn3gn")]
 
 [node name="SimpleDmMap" parent="." instance=ExtResource("5_6iepc")]
