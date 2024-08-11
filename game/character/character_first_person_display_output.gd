@@ -13,7 +13,7 @@ const CHARACTER_SPEED_RUN_THRESHOLD: float = 20.0
 
 func display_character_state(character_transform: CharacterTransformState, health: int) -> void:
 	camera_.transform = compute_camera_transform(character_transform)
-	health_label_.text = str(health)
+	health_label_.text = "Health: %d" % health
 
 func compute_camera_transform(character_transform: CharacterTransformState) -> Transform3D:
 	var camera_position: Vector3 = character_transform.position() + CAMERA_OFFSET_FROM_CHARACTER_ORIGIN
