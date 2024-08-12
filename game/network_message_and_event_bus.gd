@@ -9,6 +9,7 @@ signal triggered_remote_character_ability(
 	remote_character_entity_id: int, 
 	camera_transform: Transform3D,  
 	server_tick: int)
+signal remote_character_death(server_tick: int, character_transform: CharacterTransformState)
 signal client_disconnected(client_id: int)
 signal client_connected(client_id: int)
 signal server_disconnected()
@@ -24,7 +25,7 @@ func _ready() -> void:
 	multiplayer.peer_disconnected.connect(__deregister_client)
 	multiplayer.server_disconnected.connect(func() -> void: server_disconnected.emit())
 
-func notify_client_of_death(client_id: int) -> void:
+func notify_client_of_own_death(client_id: int) -> void:
 	__handle_death.rpc_id(client_id)
 
 func notify_client_of_respawn(client_id: int) -> void:
@@ -46,6 +47,15 @@ func trigger_remote_character_ability(
 	server_tick: int
 ) -> void:
 	__trigger_remote_character_ability.rpc(remote_character_entity_id, camera_transform, server_tick)
+
+func notify_client_of_remote_character_death(
+	client_id: int, 
+	server_tick: int, 
+	remote_character_transform: CharacterTransformState
+) -> void:
+	var serialized_data_stream := StreamPeerBuffer.new()
+	remote_character_transform.serialize_to_stream(serialized_data_stream)
+	__handle_remote_character_death.rpc_id(client_id, server_tick, serialized_data_stream.data_array)
 
 func verify_is_connected_to_server() -> void:
 	assert(multiplayer.get_peers().size() > 0, "Client is not connected to server.")
@@ -99,6 +109,13 @@ func __trigger_remote_character_ability(
 	server_tick: int
 ) -> void:
 	triggered_remote_character_ability.emit(remote_character_entity_id, camera_transform, server_tick)
+
+@rpc("authority", "call_remote", "reliable")
+func __handle_remote_character_death(server_tick: int, serialized_character_transform: PackedByteArray) -> void:
+	var serialized_data_stream := StreamPeerBuffer.new()
+	serialized_data_stream.data_array = serialized_character_transform
+	var character_transform := CharacterTransformState.consume_and_deserialize(serialized_data_stream)
+	remote_character_death.emit(server_tick, character_transform)
 
 @rpc("authority", "call_remote", "reliable")
 func __resize_window_for_debugging(index: int = 0) -> void:

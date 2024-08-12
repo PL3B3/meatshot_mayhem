@@ -28,6 +28,7 @@ var network_bus_: NetworkMessageAndEventBus
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_remote_state_buffer_: OrderedStateSnapshotBuffer
 var pending_remote_character_triggers_: Array[RemoteCharacterAbilityTrigger] = []
+var pending_remote_character_deaths_: Array[RemoteCharacterDeathEvent] = []
 var recent_client_to_server_inputs_: Array[PackedByteArray] = []
 var latest_reconciliation_data_: Optional = Optional.empty()
 var latest_authoritative_health_state: CharacterHealthState = null
@@ -41,6 +42,7 @@ func _ready() -> void:
 	network_bus_ = NetworkMessageAndEventBus.new()
 	network_bus_.received_authoritative_state_snapshot.connect(__handle_authoritative_server_state)
 	network_bus_.triggered_remote_character_ability.connect(__on_triggered_remote_character_ability)
+	network_bus_.remote_character_death.connect(__on_remote_character_death)
 	network_bus_.server_disconnected.connect(__on_server_disconnected)
 	network_bus_.respawned.connect(__on_respawn)
 	network_bus_.died.connect(__on_death)
@@ -123,6 +125,7 @@ func __display_non_predicted_state(
 		own_character_position_for_remote_hitscan_tracer_collisions, 
 		latest_remote_character_state_per_entity_id, 
 		authoritative_state_tick)
+	__handle_pending_remote_character_deaths(authoritative_state_tick)
 	__draw_bullet_tracers(remote_character_hitscan_ability_results)
 	__draw_bullet_hits(remote_character_hitscan_ability_results)
 
@@ -216,6 +219,17 @@ func __perform_remote_character_abilities(
 			unhandled_pending_triggers.push_back(pending_ability_trigger)
 	pending_remote_character_triggers_ = unhandled_pending_triggers
 	return remote_character_hitscan_ability_results
+
+func __handle_pending_remote_character_deaths(currently_displayed_server_tick: int) -> void:
+	var unhandled_pending_deaths: Array[RemoteCharacterDeathEvent] = []
+	for pending_death: RemoteCharacterDeathEvent in pending_remote_character_deaths_:
+		if __is_trigger_at_or_before_current_displayed_tick(pending_death.server_tick, currently_displayed_server_tick):
+			var remote_death := RemoteCharacterDeathDisplay.create_instance()
+			add_child(remote_death)
+			remote_death.display_character_transform(pending_death.character_transform_at_death)
+		else:
+			unhandled_pending_deaths.append(pending_death)
+	pending_remote_character_deaths_ = unhandled_pending_deaths
 
 func __extract_positions_for_characters_except_remote_character(
 	own_character_position: Vector3,
@@ -341,6 +355,9 @@ func __on_triggered_remote_character_ability(
 			camera_transform,
 			server_tick))
 
+func __on_remote_character_death(server_tick: int, character_transform: CharacterTransformState) -> void:
+	pending_remote_character_deaths_.append(RemoteCharacterDeathEvent.new(server_tick, character_transform))
+
 func __on_death() -> void:
 	death_display_.play_death_animation()
 	ticks_to_keep_running_after_death_ = 1
@@ -414,3 +431,11 @@ class RemoteCharacterAbilityTrigger:
 		self.remote_character_entity_id = remote_character_entity_id
 		self.camera_transform = camera_transform
 		self.server_tick = server_tick
+
+class RemoteCharacterDeathEvent:
+	var server_tick: int
+	var character_transform_at_death: CharacterTransformState
+
+	func _init(server_tick: int, character_transform_at_death: CharacterTransformState) -> void:
+		self.server_tick = server_tick
+		self.character_transform_at_death = character_transform_at_death
