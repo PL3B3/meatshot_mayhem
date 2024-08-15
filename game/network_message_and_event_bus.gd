@@ -4,7 +4,7 @@ const SERVER_NETWORK_ID = 1
 
 signal received_authoritative_state_snapshot(server_tick: int, client_tick: int, snapshot: ClientStateSnapshot)
 signal received_client_trigger(client_id: int, camera_transform: Transform3D, server_tick_displayed_on_client: int)
-signal remote_character_death(server_tick: int, character_transform: CharacterTransformState)
+# signal remote_character_death(server_tick: int, character_transform: CharacterTransformState)
 signal triggered_remote_character_ability(ability_trigger: RemoteCharacterAbilityTrigger)
 signal received_client_input(client_id: int, message: InputState)
 signal client_own_ability_hit_confirm(damage: int)
@@ -45,14 +45,14 @@ func send_hit_confirm_event_to_client(client_id: int, damage: int) -> void:
 func trigger_remote_character_ability(ability_trigger: RemoteCharacterAbilityTrigger) -> void:
 	__trigger_remote_character_ability.rpc(ability_trigger.serialize())
 
-func notify_client_of_remote_character_death(
-	client_id: int, 
-	server_tick: int, 
-	remote_character_transform: CharacterTransformState
-) -> void:
-	var serialized_data_stream := StreamPeerBuffer.new()
-	remote_character_transform.serialize_to_stream(serialized_data_stream)
-	__handle_remote_character_death.rpc_id(client_id, server_tick, serialized_data_stream.data_array)
+# func notify_client_of_remote_character_death(
+# 	client_id: int, 
+# 	server_tick: int, 
+# 	remote_character_transform: CharacterTransformState
+# ) -> void:
+# 	var serialized_data_stream := StreamPeerBuffer.new()
+# 	remote_character_transform.serialize_to_stream(serialized_data_stream)
+# 	__handle_remote_character_death.rpc_id(client_id, server_tick, serialized_data_stream.data_array)
 
 func verify_is_connected_to_server() -> void:
 	assert(multiplayer.get_peers().size() > 0, "Client is not connected to server.")
@@ -107,12 +107,12 @@ func __handle_hit_confirm(damage: int) -> void:
 func __trigger_remote_character_ability(serialized_ability_trigger: PackedByteArray) -> void:
 	triggered_remote_character_ability.emit(RemoteCharacterAbilityTrigger.deserialize(serialized_ability_trigger))
 
-@rpc("authority", "call_remote", "reliable")
-func __handle_remote_character_death(server_tick: int, serialized_character_transform: PackedByteArray) -> void:
-	var serialized_data_stream := StreamPeerBuffer.new()
-	serialized_data_stream.data_array = serialized_character_transform
-	var character_transform := CharacterTransformState.consume_and_deserialize(serialized_data_stream)
-	remote_character_death.emit(server_tick, character_transform)
+# @rpc("authority", "call_remote", "reliable")
+# func __handle_remote_character_death(server_tick: int, serialized_character_transform: PackedByteArray) -> void:
+# 	var serialized_data_stream := StreamPeerBuffer.new()
+# 	serialized_data_stream.data_array = serialized_character_transform
+# 	var character_transform := CharacterTransformState.consume_and_deserialize(serialized_data_stream)
+# 	remote_character_death.emit(server_tick, character_transform)
 
 @rpc("authority", "call_remote", "reliable")
 func __resize_window_for_debugging(index: int = 0) -> void:

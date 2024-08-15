@@ -198,17 +198,8 @@ class ServerGameSimulation:
 			if character_state.health_state.health <= 0:
 				simulation_state_.player_life_death_state_per_client_id[client_id] = (
 					PlayerLifeDeathState.new(RESPAWN_TIME_IN_TICKS))
-				__notify_clients_of_remote_character_death(client_id, __extract_transform_state(character_state))
 				network_message_bus_.notify_client_of_own_death(client_id)
 				simulation_state_.delete_character(client_id)
-
-	func __notify_clients_of_remote_character_death(
-		remote_character_client_id: int, 
-		remote_character_transform: CharacterTransformState
-	) -> void:
-		for client_id: int in simulation_state_.character_state_per_client_id:
-			if client_id != remote_character_client_id:
-				network_message_bus_.notify_client_of_remote_character_death(client_id, tick_, remote_character_transform)
 
 	func __display_character_states() -> void:
 		for client_id: int in simulation_state_.character_state_per_client_id:

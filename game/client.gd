@@ -29,11 +29,10 @@ var network_bus_: NetworkMessageAndEventBus
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
 var client_remote_state_buffer_: OrderedStateSnapshotBuffer
 var pending_remote_character_triggers_: Array[RemoteCharacterAbilityTrigger] = []
-var pending_remote_character_deaths_: Array[RemoteCharacterDeathEvent] = []
 var recent_client_to_server_inputs_: Array[PackedByteArray] = []
 var latest_reconciliation_data_: Optional = Optional.empty()
 var latest_authoritative_health_state: CharacterHealthState = null
-var latest_interpolated_remote_entity_snapshot := NO_REMOTE_CHARACTER_STATES
+var last_interpolated_remote_state := RemoteState.new(-1, NO_REMOTE_CHARACTER_STATES)
 var ticks_to_keep_running_after_death_ := 0
 var is_alive_ := true
 var warmed_up = false
@@ -44,7 +43,6 @@ func _ready() -> void:
 	network_bus_.received_authoritative_state_snapshot.connect(__handle_authoritative_server_state)
 	network_bus_.triggered_remote_character_ability.connect(__on_triggered_remote_character_ability)
 	network_bus_.client_own_ability_hit_confirm.connect(hit_audio_player_.play_hit_sound)
-	network_bus_.remote_character_death.connect(__on_remote_character_death)
 	network_bus_.server_disconnected.connect(__on_server_disconnected)
 	network_bus_.respawned.connect(__on_respawn)
 	network_bus_.died.connect(__on_death)
@@ -76,15 +74,17 @@ func _physics_process(_delta: float) -> void:
 	ticks_to_keep_running_after_death_ = max(0, ticks_to_keep_running_after_death_ - 1)
 
 func __run_game_simulation_tick() -> void:
-	var current_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
-	var interpolated_remote_state: QueueItem = __get_latest_queued_authoritative_state_snapshot()
-	var currently_displayed_authoritative_state_tick: int = interpolated_remote_state.tick()
-	var latest_remote_character_state_per_entity_id: Dictionary = interpolated_remote_state.value()
+	var last_state: ClientStateSnapshot = client_state_timeline_.get_current_state()
+	var last_and_next_interpolated_remote_state := __compute_last_and_next_interpolated_remote_state()
+	var next_displayed_remote_state_tick := last_and_next_interpolated_remote_state.next_state.remote_tick
+	var next_remote_character_state_per_entity_id := (
+		last_and_next_interpolated_remote_state.next_state.character_state_per_entity_id)
 
 	__display_non_predicted_state(
-		current_state.own_character_state().physics_state().position(), 
-		currently_displayed_authoritative_state_tick, 
-		latest_remote_character_state_per_entity_id)
+		last_state.own_character_state().physics_state().position(),
+		next_displayed_remote_state_tick, 
+		last_and_next_interpolated_remote_state.last_state.character_state_per_entity_id,
+		next_remote_character_state_per_entity_id)
 	
 	var client_simulation_tick := client_state_timeline_.get_next_tick()
 	var latest_input: InputState = input_handler_.latest_input(client_simulation_tick)
@@ -96,28 +96,29 @@ func __run_game_simulation_tick() -> void:
 	var next_own_character_state: ClientOwnCharacterState
 	if is_alive_ or ticks_to_keep_running_after_death_ > 0:
 		next_own_character_state = __calculate_and_display_client_predicted_state(
-			current_state, 
-			currently_displayed_authoritative_state_tick, 
-			latest_remote_character_state_per_entity_id, 
+			last_state, 
+			next_displayed_remote_state_tick, 
+			next_remote_character_state_per_entity_id, 
 			latest_input)
 	else:
 		var own_character_components: CharacterComponents = entity_spawner_.get_or_spawn_client_own_character()
 		own_character_components.first_person_display().hide_all_ui_elements_and_models()
-		next_own_character_state = current_state.own_character_state()
+		next_own_character_state = last_state.own_character_state()
 	
 	var next_state: ClientStateSnapshot = ClientStateSnapshot.new(
-		next_own_character_state, latest_remote_character_state_per_entity_id)
+		next_own_character_state, next_remote_character_state_per_entity_id)
 	client_state_timeline_.add_next_state(next_state)
 	entity_spawner_.despawn_entities_not_in_client_snapshot(next_state)
 
 func __display_non_predicted_state(
 	own_character_position: Vector3,
-	authoritative_state_tick: int, 
-	latest_remote_character_state_per_entity_id: Dictionary
+	displayed_remote_state_tick: int, 
+	last_remote_character_state_per_entity_id: Dictionary,
+	next_remote_character_state_per_entity_id: Dictionary
 	) -> void:
-	for remote_character_entity_id: int in latest_remote_character_state_per_entity_id:
+	for remote_character_entity_id: int in next_remote_character_state_per_entity_id:
 		var remote_character_state: CharacterTransformState = (
-			latest_remote_character_state_per_entity_id[remote_character_entity_id])
+			next_remote_character_state_per_entity_id[remote_character_entity_id])
 		var remote_character_components: CharacterComponents = (
 			entity_spawner_.get_or_spawn_character(remote_character_entity_id, CONSTANTS.NetworkEntityMode.OTHER_CLIENT))
 		remote_character_components.third_person_display().display_character_transform(remote_character_state)
@@ -125,9 +126,10 @@ func __display_non_predicted_state(
 		own_character_position if is_alive_ else REMOTE_HITSCAN_RAYCASTS_SHOULD_IGNORE_OWN_CHARACTER_WHEN_DEAD)
 	var remote_character_hitscan_ability_results := __perform_remote_character_abilities(
 		own_character_position_for_remote_hitscan_tracer_collisions, 
-		latest_remote_character_state_per_entity_id, 
-		authoritative_state_tick)
-	__handle_pending_remote_character_deaths(authoritative_state_tick)
+		next_remote_character_state_per_entity_id, 
+		displayed_remote_state_tick)
+	__detect_and_display_remote_character_deaths(
+		last_remote_character_state_per_entity_id, next_remote_character_state_per_entity_id)
 	__draw_bullet_tracers(remote_character_hitscan_ability_results)
 	__draw_bullet_hits(remote_character_hitscan_ability_results)
 
@@ -222,16 +224,16 @@ func __perform_remote_character_abilities(
 	pending_remote_character_triggers_ = unhandled_pending_triggers
 	return remote_character_hitscan_ability_results
 
-func __handle_pending_remote_character_deaths(currently_displayed_server_tick: int) -> void:
-	var unhandled_pending_deaths: Array[RemoteCharacterDeathEvent] = []
-	for pending_death: RemoteCharacterDeathEvent in pending_remote_character_deaths_:
-		if __is_trigger_at_or_before_current_displayed_tick(pending_death.server_tick, currently_displayed_server_tick):
-			var remote_death := RemoteCharacterDeathDisplay.create_instance()
-			add_child(remote_death)
-			remote_death.display_character_transform(pending_death.character_transform_at_death)
-		else:
-			unhandled_pending_deaths.append(pending_death)
-	pending_remote_character_deaths_ = unhandled_pending_deaths
+func __detect_and_display_remote_character_deaths(
+	last_remote_state: Dictionary, 
+	next_remote_state: Dictionary) -> void:
+	for remote_character_entity_id: int in last_remote_state:
+		if not remote_character_entity_id in next_remote_state:
+			var remote_character_transform_at_time_of_death: CharacterTransformState = (
+				last_remote_state[remote_character_entity_id])
+			var remote_character_death_display := RemoteCharacterDeathDisplay.create_instance()
+			add_child(remote_character_death_display)
+			remote_character_death_display.play_death_animation(remote_character_transform_at_time_of_death)
 
 func __extract_positions_for_characters_except_remote_character(
 	own_character_position: Vector3,
@@ -258,20 +260,27 @@ func __draw_bullet_hits(hitscan_results: Array[HitscanResult]) -> void:
 	for hitscan_result: HitscanResult in hitscan_results:
 		debug_sphere_displayer.draw_debug_sphere(hitscan_result.hit_point)
 
-func __get_latest_queued_authoritative_state_snapshot() -> QueueItem:
+func __compute_last_and_next_interpolated_remote_state() -> LastAndNextRemoteState:
 	if client_remote_state_buffer_ == null:
-		return QueueItem.new(NO_REMOTE_CHARACTER_STATES, false, -1)
+		return LastAndNextRemoteState.new(
+			RemoteState.new(-1, NO_REMOTE_CHARACTER_STATES),
+			RemoteState.new(-1, NO_REMOTE_CHARACTER_STATES))
 	var next_snapshot_item_in_buffer := client_remote_state_buffer_.pop()
 	var next_authoritative_snapshot: Dictionary = next_snapshot_item_in_buffer.value()
-	latest_interpolated_remote_entity_snapshot = StateInterpolationUtils.interpolate_remote_state_snapshots(
-		latest_interpolated_remote_entity_snapshot,
+	var interpolated_next_remote_state := StateInterpolationUtils.interpolate_remote_state_snapshots(
+		last_interpolated_remote_state.character_state_per_entity_id,
 		next_authoritative_snapshot,
 		ENTITY_INTERPOLATION_LERP_SPEED)
 	var displayed_tick_interpolation_correction_factor := int(
 		(1.0 - ENTITY_INTERPOLATION_LERP_SPEED) / ENTITY_INTERPOLATION_LERP_SPEED)
 	var displayed_server_tick: int = (
 		next_snapshot_item_in_buffer.tick() - displayed_tick_interpolation_correction_factor)
-	return QueueItem.new(latest_interpolated_remote_entity_snapshot, true, displayed_server_tick)
+	var next_remote_state_with_tick := RemoteState.new(displayed_server_tick, interpolated_next_remote_state)
+	var last_and_next_remote_state := LastAndNextRemoteState.new(
+		last_interpolated_remote_state,
+		next_remote_state_with_tick)
+	last_interpolated_remote_state = next_remote_state_with_tick
+	return last_and_next_remote_state
 
 func __reconcile_own_character_physics_state_with_authoritative_state(
 	optional_reconciliation_data: Optional,
@@ -349,9 +358,6 @@ func __handle_authoritative_server_state(server_tick: int, client_tick: int, sta
 func __on_triggered_remote_character_ability(ability_trigger: RemoteCharacterAbilityTrigger) -> void: 
 	pending_remote_character_triggers_.append(ability_trigger)
 
-func __on_remote_character_death(server_tick: int, character_transform: CharacterTransformState) -> void:
-	pending_remote_character_deaths_.append(RemoteCharacterDeathEvent.new(server_tick, character_transform))
-
 func __on_death() -> void:
 	death_display_.play_death_animation()
 	ticks_to_keep_running_after_death_ = 1
@@ -419,3 +425,19 @@ class RemoteCharacterDeathEvent:
 	func _init(server_tick: int, character_transform_at_death: CharacterTransformState) -> void:
 		self.server_tick = server_tick
 		self.character_transform_at_death = character_transform_at_death
+
+class RemoteState:
+	var remote_tick: int
+	var character_state_per_entity_id: Dictionary
+
+	func _init(remote_tick: int, character_state_per_entity_id: Dictionary) -> void:
+		self.remote_tick = remote_tick
+		self.character_state_per_entity_id = character_state_per_entity_id
+
+class LastAndNextRemoteState:
+	var last_state: RemoteState
+	var next_state: RemoteState
+
+	func _init(last_state: RemoteState, next_state: RemoteState) -> void:
+		self.last_state = last_state
+		self.next_state = next_state
