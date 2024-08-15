@@ -6,27 +6,6 @@ const ONLY_MAP_LAYER_COLLISION_MASK = 0xFFFFFFF1
 const MAX_RAYCAST_DISTANCE: float = 1000
 static var NO_INTERSECT_POINTS: Array[Vector3] = []
 
-# static func compute_nearest_raycast_intersect(
-# 		ray_origin: Vector3,
-# 		normalized_ray_direction: Vector3,
-# 		remote_character_positions: Array,
-# 		direct_space_state: PhysicsDirectSpaceState3D) -> Vector3:
-# 	var nearest_ray_intersect: Vector3 = __compute_point_where_ray_hits_map(
-# 		ray_origin, normalized_ray_direction, direct_space_state)
-# 	var nearest_intersect_distance: float = max(0, (nearest_ray_intersect - ray_origin).length())
-# 	for remote_character_position: Vector3 in remote_character_positions:
-# 		var ray_intersect_points_with_remote_character: Array[Vector3] = __compute_ray_sphere_intersect_points(
-# 			ray_origin,
-# 			normalized_ray_direction,
-# 			remote_character_position,
-# 			2.5)
-# 		for intersect_point: Vector3 in ray_intersect_points_with_remote_character:
-# 			var intersect_point_distance_from_ray_origin: float = (intersect_point - ray_origin).length()
-# 			if intersect_point_distance_from_ray_origin < nearest_intersect_distance:
-# 				nearest_intersect_distance = intersect_point_distance_from_ray_origin
-# 				nearest_ray_intersect = intersect_point
-# 	return nearest_ray_intersect
-
 static func compute_nearest_raycast_intersect(
 		ray_origin: Vector3,
 		normalized_ray_direction: Vector3,

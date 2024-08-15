@@ -5,6 +5,7 @@ const SERVER_NETWORK_ID = 1
 signal received_authoritative_state_snapshot(server_tick: int, client_tick: int, snapshot: ClientStateSnapshot)
 signal received_client_trigger(client_id: int, camera_transform: Transform3D, server_tick_displayed_on_client: int)
 signal received_client_input(client_id: int, message: InputState)
+signal client_own_ability_hit_confirm(damage: int)
 signal triggered_remote_character_ability(
 	remote_character_entity_id: int, 
 	camera_transform: Transform3D,  
@@ -40,6 +41,9 @@ func send_inputs_to_server(input_messages: Array) -> void:
 
 func send_trigger_to_server(camera_transform: Transform3D, server_tick_displayed: int) -> void:
 	ct2s.rpc_id(SERVER_NETWORK_ID, camera_transform, server_tick_displayed)
+
+func send_hit_confirm_event_to_client(client_id: int, damage: int) -> void:
+	__handle_hit_confirm.rpc_id(client_id, damage)
 
 func trigger_remote_character_ability(
 	remote_character_entity_id: int,
@@ -101,6 +105,10 @@ func __handle_death() -> void:
 @rpc("authority", "call_remote", "reliable")
 func __handle_respawn() -> void:
 	respawned.emit()
+
+@rpc("authority", "call_remote", "reliable")
+func __handle_hit_confirm(damage: int) -> void:
+	client_own_ability_hit_confirm.emit(damage)
 
 @rpc("authority", "call_remote", "reliable")
 func __trigger_remote_character_ability(

@@ -163,7 +163,16 @@ class ServerGameSimulation:
 				var ability_result := character_components.ability_action().perform_ability(
 					ability_trigger.camera_transform, other_character_positions_during_current_tick)
 				hitscan_ability_results.append_array(ability_result.hitscan_results)
+				__notify_client_of_hit_damage_if_nonzero(client_id, ability_result.hitscan_results)
 		simulation_state_.hitscan_results = hitscan_ability_results
+
+	func __notify_client_of_hit_damage_if_nonzero(client_id: int, hitscan_results: Array[HitscanResult]) -> void:
+		var total_damage: int = 0
+		for hit: HitscanResult in hitscan_results:
+			if hit.hit_entity_id != RaycastUtils.NO_ENTITY_HIT:
+				total_damage += hit.damage
+		if total_damage > 0:
+			network_message_bus_.send_hit_confirm_event_to_client(client_id, total_damage)
 
 	func __compute_next_state_for_characters() -> void:
 		var next_character_states := {}

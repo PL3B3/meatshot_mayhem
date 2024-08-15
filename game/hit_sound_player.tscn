@@ -1,0 +1,9 @@
+[gd_scene load_steps=3 format=3 uid="uid://bxnmyswpjdfy7"]
+
+[ext_resource type="AudioStream" uid="uid://dta06jfwm5o34" path="res://assets/hitsound.ogg" id="1_ak1re"]
+[ext_resource type="Script" path="res://game/hit_sound_player.gd" id="2_h80ri"]
+
+[node name="HitSoundPlayer" type="AudioStreamPlayer"]
+stream = ExtResource("1_ak1re")
+volume_db = -10.0
+script = ExtResource("2_h80ri")

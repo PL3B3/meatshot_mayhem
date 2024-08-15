@@ -23,6 +23,7 @@ const ENABLE_LOGGING := false
 @onready var debug_label_: Label = $DebugLabel
 @onready var entity_spawner_: EntitySpawner = $EntitySpawner
 @onready var death_display_: ClientDeathDisplay = $ClientDeathDisplay
+@onready var hit_audio_player_: HitSoundPlayer = $HitSoundPlayer
 
 var network_bus_: NetworkMessageAndEventBus
 var client_state_timeline_: ClientStateTimeline = ClientStateTimeline.new()
@@ -42,6 +43,7 @@ func _ready() -> void:
 	network_bus_ = NetworkMessageAndEventBus.new()
 	network_bus_.received_authoritative_state_snapshot.connect(__handle_authoritative_server_state)
 	network_bus_.triggered_remote_character_ability.connect(__on_triggered_remote_character_ability)
+	network_bus_.client_own_ability_hit_confirm.connect(hit_audio_player_.play_hit_sound)
 	network_bus_.remote_character_death.connect(__on_remote_character_death)
 	network_bus_.server_disconnected.connect(__on_server_disconnected)
 	network_bus_.respawned.connect(__on_respawn)

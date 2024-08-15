@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3 uid="uid://clb01f0ifogre"]
+[gd_scene load_steps=7 format=3 uid="uid://clb01f0ifogre"]
 
 [ext_resource type="Script" path="res://game/client.gd" id="1_x1e1o"]
 [ext_resource type="PackedScene" uid="uid://b43a0dnmkibyw" path="res://game/client_input_handler.tscn" id="4_53bko"]
 [ext_resource type="PackedScene" uid="uid://cdeofkdnlceq7" path="res://game/simple_dm_map.tscn" id="5_6iepc"]
 [ext_resource type="PackedScene" uid="uid://c81hmgxgnhrjb" path="res://game/client_death_display.tscn" id="5_qn3gn"]
 [ext_resource type="PackedScene" uid="uid://df8ewfg0kmle6" path="res://game/entity_spawner.tscn" id="5_w3vlx"]
+[ext_resource type="PackedScene" uid="uid://bxnmyswpjdfy7" path="res://game/hit_sound_player.tscn" id="6_x3gus"]
 
 [node name="NetworkRoot" type="Node"]
 script = ExtResource("1_x1e1o")
@@ -31,3 +32,5 @@ text = "CLIENT"
 [node name="ClientDeathDisplay" parent="." instance=ExtResource("5_qn3gn")]
 
 [node name="SimpleDmMap" parent="." instance=ExtResource("5_6iepc")]
+
+[node name="HitSoundPlayer" parent="." instance=ExtResource("6_x3gus")]
