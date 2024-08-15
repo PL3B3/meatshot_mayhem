@@ -4,13 +4,10 @@ const SERVER_NETWORK_ID = 1
 
 signal received_authoritative_state_snapshot(server_tick: int, client_tick: int, snapshot: ClientStateSnapshot)
 signal received_client_trigger(client_id: int, camera_transform: Transform3D, server_tick_displayed_on_client: int)
+signal remote_character_death(server_tick: int, character_transform: CharacterTransformState)
+signal triggered_remote_character_ability(ability_trigger: RemoteCharacterAbilityTrigger)
 signal received_client_input(client_id: int, message: InputState)
 signal client_own_ability_hit_confirm(damage: int)
-signal triggered_remote_character_ability(
-	remote_character_entity_id: int, 
-	camera_transform: Transform3D,  
-	server_tick: int)
-signal remote_character_death(server_tick: int, character_transform: CharacterTransformState)
 signal client_disconnected(client_id: int)
 signal client_connected(client_id: int)
 signal server_disconnected()
@@ -45,12 +42,8 @@ func send_trigger_to_server(camera_transform: Transform3D, server_tick_displayed
 func send_hit_confirm_event_to_client(client_id: int, damage: int) -> void:
 	__handle_hit_confirm.rpc_id(client_id, damage)
 
-func trigger_remote_character_ability(
-	remote_character_entity_id: int,
-	camera_transform: Transform3D, 
-	server_tick: int
-) -> void:
-	__trigger_remote_character_ability.rpc(remote_character_entity_id, camera_transform, server_tick)
+func trigger_remote_character_ability(ability_trigger: RemoteCharacterAbilityTrigger) -> void:
+	__trigger_remote_character_ability.rpc(ability_trigger.serialize())
 
 func notify_client_of_remote_character_death(
 	client_id: int, 
@@ -111,12 +104,8 @@ func __handle_hit_confirm(damage: int) -> void:
 	client_own_ability_hit_confirm.emit(damage)
 
 @rpc("authority", "call_remote", "reliable")
-func __trigger_remote_character_ability(
-	remote_character_entity_id: int,
-	camera_transform: Transform3D, 
-	server_tick: int
-) -> void:
-	triggered_remote_character_ability.emit(remote_character_entity_id, camera_transform, server_tick)
+func __trigger_remote_character_ability(serialized_ability_trigger: PackedByteArray) -> void:
+	triggered_remote_character_ability.emit(RemoteCharacterAbilityTrigger.deserialize(serialized_ability_trigger))
 
 @rpc("authority", "call_remote", "reliable")
 func __handle_remote_character_death(server_tick: int, serialized_character_transform: PackedByteArray) -> void:

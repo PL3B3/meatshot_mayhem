@@ -233,8 +233,9 @@ class ServerGameSimulation:
 		for client_id: int in simulation_state_.character_state_per_client_id:
 			var character_state: ServerCharacterState = simulation_state_.character_state_per_client_id[client_id]
 			for ability_trigger: InputTrigger in character_state.input.input_triggers:
-				network_message_bus_.trigger_remote_character_ability(
+				var trigger_wrapped_as_remote_character_trigger := RemoteCharacterAbilityTrigger.new(
 					character_state.character_entity_id, ability_trigger.camera_transform, tick_)
+				network_message_bus_.trigger_remote_character_ability(trigger_wrapped_as_remote_character_trigger)
 	
 	func __despawn_entities_not_in_simulation_state() -> void:
 		entity_spawner_.despawn_entities_not_in_server_snapshot(simulation_state_.character_state_per_client_id)

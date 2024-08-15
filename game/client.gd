@@ -346,16 +346,8 @@ func __handle_authoritative_server_state(server_tick: int, client_tick: int, sta
 			ReconciliationData.from_server_to_client_snapshot(client_tick, state_snapshot))
 	latest_authoritative_health_state = state_snapshot.own_character_state().health_state()
 
-func __on_triggered_remote_character_ability(
-	remote_character_entity_id: int,
-	camera_transform: Transform3D, 
-	server_tick: int
-	) -> void: 
-	pending_remote_character_triggers_.append(
-		RemoteCharacterAbilityTrigger.new(
-			remote_character_entity_id,
-			camera_transform,
-			server_tick))
+func __on_triggered_remote_character_ability(ability_trigger: RemoteCharacterAbilityTrigger) -> void: 
+	pending_remote_character_triggers_.append(ability_trigger)
 
 func __on_remote_character_death(server_tick: int, character_transform: CharacterTransformState) -> void:
 	pending_remote_character_deaths_.append(RemoteCharacterDeathEvent.new(server_tick, character_transform))
@@ -419,20 +411,6 @@ class ReconciliationData:
 	
 	func client_tick() -> int:
 		return client_tick_
-
-class RemoteCharacterAbilityTrigger:
-	var remote_character_entity_id: int
-	var camera_transform: Transform3D
-	var server_tick: int
-
-	func _init(
-		remote_character_entity_id: int, 
-		camera_transform: Transform3D, 
-		server_tick: int
-	) -> void:
-		self.remote_character_entity_id = remote_character_entity_id
-		self.camera_transform = camera_transform
-		self.server_tick = server_tick
 
 class RemoteCharacterDeathEvent:
 	var server_tick: int
