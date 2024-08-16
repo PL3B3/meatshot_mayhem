@@ -3,12 +3,12 @@
 [ext_resource type="AudioStream" uid="uid://di317k1qmcrbf" path="res://assets/death_bell.ogg" id="1_28fkk"]
 [ext_resource type="Script" path="res://game/client_death_display.gd" id="1_ecc2r"]
 
-[sub_resource type="Gradient" id="Gradient_wkas1"]
+[sub_resource type="Gradient" id="Gradient_e2o2w"]
 offsets = PackedFloat32Array(0)
 colors = PackedColorArray(0, 0, 0, 1)
 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_ia1ny"]
-gradient = SubResource("Gradient_wkas1")
+gradient = SubResource("Gradient_e2o2w")
 
 [sub_resource type="LabelSettings" id="LabelSettings_3jujc"]
 line_spacing = 100.0
@@ -16,7 +16,7 @@ font_size = 120
 
 [sub_resource type="Animation" id="Animation_3s0lt"]
 resource_name = "death_screen_fade_in"
-length = 4.5
+length = 4.0
 tracks/0/type = "audio"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -26,7 +26,7 @@ tracks/0/loop_wrap = true
 tracks/0/keys = {
 "clips": [{
 "end_offset": 0.0,
-"start_offset": 0.0,
+"start_offset": 0.02,
 "stream": ExtResource("1_28fkk")
 }],
 "times": PackedFloat32Array(0)
